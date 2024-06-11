@@ -8,14 +8,14 @@ const apiUrlQuery='?api-version=2016-11-01&$expand=swagger,properties.connection
 const regExFlow=new RegExp( '/flows\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
 const regExEnvir=new RegExp( '/environments\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
 const regExEnvirD=new RegExp( '/environments\/Default-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
+//const sExcepExpressionTemplate="@{split(split(replace(replace(replace(concat({containers}),'\"Message\":','\"message\":'),'\"message\":\"An action failed. No dependent actions succeeded','¬'),'essage\":\"The execution of template ','¬'),'essage\":\"')[1],'\"')[0]}"
 const sExcepExpressionTemplate=
-"@{split(split(replace(replace(concat({containers}),'essage\":\"An action failed. No dependent actions succeeded','¬'),'essage\":\"The execution of template ','¬'),'essage\":\"')[1],'\"')[0]}"
+"@{xpath(xml(json(concat('{\"data\": {',<container>,'}}'))),'string(//message[not(contains(.,''The execution of template action'')) and not(contains(.,''skipped:''))  and not(contains(.,''An action failed. No dependent actions succeeded.''))])')}";
 
   chrome.action.onClicked.addListener((tab) => {
     if(sFlowAPI!="" && flowIdMatch!=""){
       getActions();
     }
-    
   });
 
   chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, info) {
@@ -26,10 +26,10 @@ const sExcepExpressionTemplate=
     flowIdMatch = info.url.match(regExFlow);
     if(!flowIdMatch){flowIdMatch=sAPIflow}
     if(flowIdMatch!=""){
-    envirIdMatch = info.url.match(regExEnvir);
-        if(!envirIdMatch){
-            envirIdMatch=info.url.match(regExEnvirD)[0];
-        }
+      envirIdMatch = info.url.match(regExEnvir);
+      if(!envirIdMatch){
+          envirIdMatch=info.url.match(regExEnvirD)[0];
+      }
     }
   })
 
@@ -53,22 +53,23 @@ const sExcepExpressionTemplate=
     const sApiUrl=apiUrl+envirIdMatch+flowIdMatch+apiUrlQuery
     fetchAPIData(sApiUrl, sFlowAPI)
     .then(data => {
-        const aActions=getChildren (data.properties.definition,new Array(),0,"root");
-        console.log(aActions)
-        let sContainers="";
-        let sListContainers="";
-        const aContainers=aActions.filter(item =>{
-          return (item.type=="Scope" ||  item.type=="Foreach" ||  item.type=="Switch"||  item.type=="If" ||  item.type=="Until") && !item.operationName.toLowerCase().includes("exception")
-        })
-        aContainers.forEach(item =>{
-          sContainers+=("string(result('"+item.operationName+"')),")
-          sListContainers+=item.operationName+"\n"
-        })
-        const sExcepExpression=sExcepExpressionTemplate.replace('{containers}',sContainers.substring(0,sContainers.length-1))
-        chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:sExcepExpression,containers:sListContainers.substring(0,sContainers.length-1)},
-            function(response){
-              console.log("success");
-            });
+      const aActions=getChildren (data.properties.definition,new Array(),0,"root");
+      console.log(aActions)
+      let sContainers="";
+      let sListContainers="";
+      const aContainers=aActions.filter(item =>{
+        return (item.type=="Scope" ||  item.type=="Foreach" ||  item.type=="Switch"||  item.type=="If" ||  item.type=="Until") && !item.operationName.toLowerCase().includes("exception")
+      })
+      aContainers.forEach(item =>{
+        //sContainers+=("string(result('"+item.operationName+"')),")
+        sContainers+="'\""+item.operationName+"\":',result('"+item.operationName+"'),',',";
+        sListContainers+=item.operationName+"\n"
+      })
+      const sExcepExpression=sExcepExpressionTemplate.replace('<container>',sContainers.substring(0,sContainers.length-1))
+      chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:sExcepExpression,containers:sListContainers.substring(0,sContainers.length-1)},
+        function(response){
+          console.log(response);
+        });
     })
     .catch(error => {
         console.error('Error:', error);
@@ -106,8 +107,7 @@ const sExcepExpressionTemplate=
         aReturn=getChildren(value,aReturn,nested+1,key)
       });
     }
-  
-  
+    
     if(object?.cases!= undefined){
       const keys = Object.keys(object.cases);
       keys.forEach((key) => {

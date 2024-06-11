@@ -1,11 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Power DevBox Exceptions",
-  "version": "0.1",
+  "version": "1.0.1",
   "description": "Creates Exception catch expression for Power Automate",
+  "icons": { 
+    "128": "exception 128.png" 
+    },
   "action": {
     "default_icon": {
-      "128": "icon v2 128.png" 
+      "128": "exception 128.png" 
     },
     "default_title": "Exceptions"
   },
