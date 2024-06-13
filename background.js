@@ -65,7 +65,7 @@ const sExcepExpressionTemplate=
 function resetIcon(){
   clearInterval(timer);
   chrome.action.setIcon({
-    path: "exception v2 128.png"
+    path: "exception circle 128 v2.png"
   });
   bLoading=false;
 }
