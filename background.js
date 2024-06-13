@@ -3,6 +3,8 @@ let sFlowAPI="";
 let sAPIflow="";
 let flowIdMatch ="";
 let envirIdMatch="";
+let timer;
+let bLoading=false;
 const apiUrl = 'https://us.api.flow.microsoft.com/providers/Microsoft.ProcessSimple';
 const apiUrlQuery='?api-version=2016-11-01&$expand=swagger,properties.connectionreferences.apidefinition,properties.definitionSummary.operations.apiOperation,operationDefinition,plan,properties.throttleData,properties.estimatedsuspensiondata';
 const regExFlow=new RegExp( '/flows\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
@@ -13,15 +15,68 @@ const sExcepExpressionTemplate=
 "@{xpath(xml(json(concat('{\"data\": {',<container>,'}}'))),'string(//message[not(contains(.,''The execution of template action'')) and not(contains(.,''skipped:''))  and not(contains(.,''An action failed. No dependent actions succeeded.''))])')}";
 
   chrome.action.onClicked.addListener((tab) => {
-    if(sFlowAPI!="" && flowIdMatch!=""){
+    if(sFlowAPI!="" && flowIdMatch!="" && !bLoading){
+      bLoading=true;
+      loading();
       getActions();
+    }else if(bLoading){
+      chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"For more information please visit: www.powerdevbox.com"},
+      function(response){
+        console.log(response);
+      });
     }
+    if(sFlowAPI=="" && flowIdMatch!=""){
+      chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Unable to access Flow, please refresh browser"},
+      function(response){
+        console.log(response);
+        resetIcon();
+      });
+    }
+    if(flowIdMatch==""){
+      chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Incorrect screen, please ensure on a flow edit screen"},
+      function(response){
+        console.log(response);
+        resetIcon();
+      });
+    }
+ 
   });
+
+  
+  function loading(){
+    let bTurned=false;
+    let iCounter=0
+    timer=setInterval(() => {
+      if(bTurned){
+        chrome.action.setIcon({
+          path: "loading up.png"
+        });
+      }else{
+        chrome.action.setIcon({
+          path: "loading side.png"
+        });
+      }
+      bTurned=!bTurned;
+    if (iCounter>10){   
+      resetIcon();     
+    }
+    iCounter++;
+    }, 500);
+}
+
+function resetIcon(){
+  clearInterval(timer);
+  chrome.action.setIcon({
+    path: "exception v2 128.png"
+  });
+  bLoading=false
+}
 
   chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, info) {
     if(sActiveTab!=tabId && changeInfo.status == "complete"){
         chrome.scripting.executeScript({target: {tabId: tabId}, files: ['content.js']})
     }
+    
     sActiveTab=tabId;
     flowIdMatch = info.url.match(regExFlow);
     if(!flowIdMatch){flowIdMatch=sAPIflow}
@@ -40,7 +95,7 @@ const sExcepExpressionTemplate=
     if (details.tabId == sActiveTab)  { 
         for(var i = 0; i < details.requestHeaders.length;i++) {
         if(details.requestHeaders[i].name.toLowerCase() == "authorization"){
-          sFlowAPI=details.requestHeaders[i].value      
+          sFlowAPI=details.requestHeaders[i].value   ; 
         }
       }
     }
@@ -65,14 +120,21 @@ const sExcepExpressionTemplate=
         sContainers+="'\""+item.operationName+"\":',result('"+item.operationName+"'),',',";
         sListContainers+=item.operationName+"\n"
       })
-      const sExcepExpression=sExcepExpressionTemplate.replace('<container>',sContainers.substring(0,sContainers.length-1))
-      chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:sExcepExpression,containers:sListContainers.substring(0,sContainers.length-1)},
+      const sExcepExpression=sExcepExpressionTemplate.replace('<container>',sContainers.substring(0,sContainers.length-1));
+      const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+sListContainers.substring(0,sContainers.length-1);
+      chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:sExcepExpression,popup:sPopup},
         function(response){
           console.log(response);
-        });
+          resetIcon();
+      });
     })
     .catch(error => {
-        console.error('Error:', error);
+      console.error('Error:', error);
+      chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:sExcepExpression,popup:'Error:\n'+error},
+      function(response){
+        console.log(response);
+        resetIcon();
+      });
     });   
   }
 

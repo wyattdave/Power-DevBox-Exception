@@ -4,7 +4,10 @@ chrome.runtime.onMessage.addListener(
       sendResponse("received")
       if(request.message =="clipboard"){
         navigator.clipboard.writeText(request.data);
-        alert("Added to clipboard.\nContainers:\n"+request.containers)
+        alert(request.popup)
+      }
+      if(request.message =="popup"){
+        alert(request.popup)
       }
 })
 
