@@ -38,10 +38,8 @@ const sExcepExpressionTemplate=
         console.log(response);
         resetIcon();
       });
-    }
- 
+    } 
   });
-
   
   function loading(){
     let bTurned=false;
@@ -69,17 +67,17 @@ function resetIcon(){
   chrome.action.setIcon({
     path: "exception v2 128.png"
   });
-  bLoading=false
+  bLoading=false;
 }
 
   chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, info) {
     if(sActiveTab!=tabId && changeInfo.status == "complete"){
-        chrome.scripting.executeScript({target: {tabId: tabId}, files: ['content.js']})
+        chrome.scripting.executeScript({target: {tabId: tabId}, files: ['content.js']});
     }
     
     sActiveTab=tabId;
     flowIdMatch = info.url.match(regExFlow);
-    if(!flowIdMatch){flowIdMatch=sAPIflow}
+    if(!flowIdMatch){flowIdMatch=sAPIflow};
     if(flowIdMatch!=""){
       envirIdMatch = info.url.match(regExEnvir);
       if(!envirIdMatch){
@@ -90,12 +88,12 @@ function resetIcon(){
 
   chrome.webRequest.onBeforeSendHeaders.addListener(function(details) {
     const flowIdMatch = details.url.match(regExFlow);
-    if(flowIdMatch){sAPIflow=flowIdMatch}
+    if(flowIdMatch){sAPIflow=flowIdMatch};
     if(!sActiveTab){sActiveTab=details.tabId}
-    if (details.tabId == sActiveTab)  { 
+    if (details.tabId == sActiveTab){ 
         for(var i = 0; i < details.requestHeaders.length;i++) {
         if(details.requestHeaders[i].name.toLowerCase() == "authorization"){
-          sFlowAPI=details.requestHeaders[i].value   ; 
+          sFlowAPI=details.requestHeaders[i].value; 
         }
       }
     }
@@ -141,20 +139,20 @@ function resetIcon(){
   function getChildren(object,aReturn,nested,sParent){
     let parent;
     if(isObject(sParent)){
-      parent=sParent.operationName
+      parent=sParent.operationName;
     }else{
-      parent=sParent
+      parent=sParent;
     }
     if(object?.actions!= undefined){
       const keys = Object.keys(object.actions);
       keys.forEach((key) => {
         let value = object.actions[key];
         value.operationName=key;
-        value.nestedLevel=nested,
-        value.parent=parent,
-        value.branch="Yes"
+        value.nestedLevel=nested;
+        value.parent=parent;
+        value.branch="Yes";
         aReturn.push(value);
-        aReturn=getChildren(value,aReturn,nested+1,key)
+        aReturn=getChildren(value,aReturn,nested+1,key);
       });
     }
     if(object?.else!= undefined){
@@ -162,11 +160,11 @@ function resetIcon(){
       keys.forEach((key) => {
         let value = object.else.actions[key];
         value.operationName=key;
-        value.nestedLevel=nested,
-        value.parent=parent,
+        value.nestedLevel=nested;
+        value.parent=parent;
         value.branch="No"
         aReturn.push(value);
-        aReturn=getChildren(value,aReturn,nested+1,key)
+        aReturn=getChildren(value,aReturn,nested+1,key);
       });
     }
     
@@ -179,9 +177,9 @@ function resetIcon(){
           
           let value2 = object.cases[key].actions[key2];
           value2.operationName=key2;
-          value2.nestedLevel=nested,
-          value2.parent=parent,
-          value2.branch=key
+          value2.nestedLevel=nested;
+          value2.parent=parent;
+          value2.branch=key;
           aReturn.push(value2);
           aReturn=getChildren(value2,aReturn,nested+1,key2)
         })
@@ -190,15 +188,15 @@ function resetIcon(){
       keysDef.forEach((keyDef) => {
         let valueDefault=object.default.actions[keyDef];
         valueDefault.operationName=keyDef;
-        valueDefault.nestedLevel=nested,
-        valueDefault.parent=parent,
-        valueDefault.branch="Default"
+        valueDefault.nestedLevel=nested;
+        valueDefault.parent=parent;
+        valueDefault.branch="Default";
         aReturn.push(valueDefault);
         aReturn=getChildren(valueDefault,aReturn,nested+1,valueDefault)
       })
       
     }
-    return aReturn
+    return aReturn;
   }
 
   function isObject(objValue) {
@@ -209,7 +207,7 @@ function resetIcon(){
     try {
       const options = {
         headers: {
-          Authorization: token,
+          Authorization: token
         },
       };
       const response = await fetch(url, options);
