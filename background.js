@@ -103,6 +103,7 @@ function resetIcon(){
   );
 
   function getActions(){
+    let sExcepExpression="";
     const sApiUrl=apiUrl+envirIdMatch+flowIdMatch+apiUrlQuery
     fetchAPIData(sApiUrl, sFlowAPI)
     .then(data => {
@@ -118,7 +119,7 @@ function resetIcon(){
         sContainers+="'\""+item.operationName+"\":',result('"+item.operationName+"'),',',";
         sListContainers+=item.operationName+"\n"
       })
-      const sExcepExpression=sExcepExpressionTemplate.replace('<container>',sContainers.substring(0,sContainers.length-1));
+      sExcepExpression=sExcepExpressionTemplate.replace('<container>',sContainers.substring(0,sContainers.length-1));
       const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+sListContainers.substring(0,sContainers.length-1);
       chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:sExcepExpression,popup:sPopup},
         function(response){
