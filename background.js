@@ -76,14 +76,9 @@ function resetIcon(){
     }
     
     sActiveTab=tabId;
-    flowIdMatch = info.url.match(regExFlow);
-    if(!flowIdMatch){flowIdMatch=sAPIflow};
-    if(flowIdMatch!=""){
-      envirIdMatch = info.url.match(regExEnvir);
-      if(!envirIdMatch){
-          envirIdMatch=info.url.match(regExEnvirD)[0];
-      }
-    }
+    oReturn=getEnvironment(info.url);
+    flowIdMatch=oReturn.flow;
+    envirIdMatch=oReturn.environment;
   })
 
   chrome.webRequest.onBeforeSendHeaders.addListener(function(details) {
@@ -102,39 +97,74 @@ function resetIcon(){
     ["requestHeaders", "extraHeaders"]
   );
 
+function getEnvironment(url){
+  let sEnvirIdMatch
+  let sFlowIdMatch = url.match(regExFlow);
+  if(!flowIdMatch){flowIdMatch=sAPIflow};
+  if(flowIdMatch!=""){
+    sEnvirIdMatch = url.match(regExEnvir);
+    if(!sEnvirIdMatch){
+      sEnvirIdMatch=url.match(regExEnvirD)[0];
+    }
+  }
+  return {environment:sEnvirIdMatch,flow:sFlowIdMatch}
+}
+
+
   function getActions(){
     let sExcepExpression="";
-    const sApiUrl=apiUrl+envirIdMatch+flowIdMatch+apiUrlQuery
-    fetchAPIData(sApiUrl, sFlowAPI)
-    .then(data => {
-      const aActions=getChildren (data.properties.definition,new Array(),0,"root");
-      console.log(aActions)
-      let sContainers="";
-      let sListContainers="";
-      const aContainers=aActions.filter(item =>{
-        return (item.type=="Scope" ||  item.type=="Foreach" ||  item.type=="Switch"||  item.type=="If" ||  item.type=="Until") && !item.operationName.toLowerCase().includes("exception")
+
+    (async () => {
+      // see the note below on how to choose currentWindow or lastFocusedWindow
+      const [tab] = await chrome.tabs.query({active: true, lastFocusedWindow: true});
+      sActiveTab=tab.id;
+      console.log(tab.url);
+      oReturn=getEnvironment(tab.url);
+      flowIdMatch=oReturn.flow;
+      envirIdMatch=oReturn.environment;
+      const sApiUrl=apiUrl+envirIdMatch+flowIdMatch+apiUrlQuery
+
+
+      fetchAPIData(sApiUrl, sFlowAPI)
+      .then(data => {
+        const aActions=getChildren (data.properties.definition,new Array(),0,"root");
+        console.log(aActions)
+        let sContainers="";
+        let sListContainers="";
+        const aContainers=aActions.filter(item =>{
+          return (item.type=="Scope" ||  item.type=="Foreach" ||  item.type=="Switch"||  item.type=="If" ||  item.type=="Until") && !item.operationName.toLowerCase().includes("exception")
+        })
+        aContainers.forEach(item =>{
+          //sContainers+=("string(result('"+item.operationName+"')),")
+          sContainers+="'\""+item.operationName+"\":',result('"+item.operationName+"'),',',";
+          sListContainers+=item.operationName+"\n"
+        })
+        sExcepExpression=sExcepExpressionTemplate.replace('<container>',sContainers.substring(0,sContainers.length-1));
+        const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+sListContainers.substring(0,sContainers.length-1);
+        chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:sExcepExpression,popup:sPopup},
+          function(response){
+            let error = chrome.runtime.lastError;            
+            if(error){
+              sendError(error)
+            }else{
+              resetIcon();
+            }
+        });
       })
-      aContainers.forEach(item =>{
-        //sContainers+=("string(result('"+item.operationName+"')),")
-        sContainers+="'\""+item.operationName+"\":',result('"+item.operationName+"'),',',";
-        sListContainers+=item.operationName+"\n"
-      })
-      sExcepExpression=sExcepExpressionTemplate.replace('<container>',sContainers.substring(0,sContainers.length-1));
-      const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+sListContainers.substring(0,sContainers.length-1);
-      chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:sExcepExpression,popup:sPopup},
+      .catch(error => {
+        console.error('Error:', error);
+        sendError(error)
+      });  
+    })(); 
+  }
+
+  function sendError(error){
+    console.log(error);
+    chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:[],popup:'Error:\n'+error},
         function(response){
-          console.log(response);
+          
           resetIcon();
-      });
-    })
-    .catch(error => {
-      console.error('Error:', error);
-      chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:sExcepExpression,popup:'Error:\n'+error},
-      function(response){
-        console.log(response);
-        resetIcon();
-      });
-    });   
+        });
   }
 
   function getChildren(object,aReturn,nested,sParent){
