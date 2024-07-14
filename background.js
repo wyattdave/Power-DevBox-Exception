@@ -41,6 +41,26 @@ const sExcepExpressionTemplate=
       });
     } 
   });
+
+  chrome.runtime.onMessage.addListener(
+    function(request, sender, sendResponse) {
+      sendResponse("received")
+      if(request.message =="actions"){
+        const oConatiners=createExpression(request.containers,request.actions);
+        const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+oConatiners.list;
+        const aContainers=request.containers;
+        chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:oConatiners.expression,array:aContainers,popup:""},
+          function(response){
+            let error = chrome.runtime.lastError;            
+            if(error){
+              sendError(error)
+            }else{
+              resetIcon();
+            }
+        });
+      }
+    }
+  )
   
   function loading(){
     let bTurned=false;
@@ -119,56 +139,62 @@ function getEnvironment(url){
 }
 
 
-  function getActions(){
-    let sExcepExpression="";
+function getActions(){
 
-    (async () => {
-      // see the note below on how to choose currentWindow or lastFocusedWindow
-      const [tab] = await chrome.tabs.query({active: true, lastFocusedWindow: true});
-      sActiveTab=tab.id;
-      console.log(tab.url);
-      oReturn=getEnvironment(tab.url);
-      flowIdMatch=oReturn.flow;
-      envirIdMatch=oReturn.environment;
-      const sApiUrl=apiUrl+envirIdMatch+flowIdMatch+apiUrlQuery
+  (async () => {
+    const [tab] = await chrome.tabs.query({active: true, lastFocusedWindow: true});
+    sActiveTab=tab.id;
+    console.log(tab.url);
+    oReturn=getEnvironment(tab.url);
+    flowIdMatch=oReturn.flow;
+    envirIdMatch=oReturn.environment;
+    const sApiUrl=apiUrl+envirIdMatch+flowIdMatch+apiUrlQuery;
 
-
-      fetchAPIData(sApiUrl, sFlowAPI)
-      .then(data => {
-        const aActions=getChildren (data.properties.definition,new Array(),0,"root");
-        console.log(aActions)
-       
-        const aContainers=aActions.filter(item =>{
-          return (item.type=="Scope" ||  item.type=="Foreach" ||  item.type=="Switch"||  item.type=="If" ||  item.type=="Until") && !item.operationName.toLowerCase().includes("exception")
-        })
-        const oConatiners=createExpression(aContainers);
-        console.log(oConatiners)
-        const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+oConatiners.list;
-        chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:oConatiners.expression,popup:sPopup},
-          function(response){
-            let error = chrome.runtime.lastError;            
-            if(error){
-              sendError(error)
-            }else{
-              resetIcon();
-            }
-        });
+    fetchAPIData(sApiUrl, sFlowAPI)
+    .then(data => {
+      const aActions=getChildren (data.properties.definition,new Array(),0,"root");
+      console.log(aActions)
+      
+      const aContainers=aActions.filter(item =>{
+        return (item.type=="Scope" ||  item.type=="Foreach" ||  item.type=="Switch"||  item.type=="If" ||  item.type=="Until") && !item.operationName.toLowerCase().includes("exception")
       })
-      .catch(error => {
-        console.error('Error:', error);
-        sendError(error)
-      });  
-    })(); 
-  }
+      const oConatiners=createExpression(aContainers,[]);
+      console.log(oConatiners)
+      const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+oConatiners.list;
+      chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:oConatiners.expression,array:aContainers,popup:sPopup},
+        function(response){
+          let error = chrome.runtime.lastError;            
+          if(error){
+            sendError(error)
+          }else{
+            resetIcon();
+          }
+      });
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      sendError(error)
+    });  
+  })(); 
+}
 
-function createExpression(aContainers){
+function createExpression(aContainers,aActions){
   let sContainers="";
   let sListContainers="";
+  console.log(aActions)
   aContainers.forEach(item =>{
     //sContainers+=("string(result('"+item.operationName+"')),")
     sContainers+="'\""+item.operationName+"\":',result('"+item.operationName+"'),',',";
     sListContainers+=item.operationName+"\n"
   })
+  if(aActions.length>0){
+    aActions.forEach(item =>{
+      //sContainers+=("string(result('"+item.operationName+"')),")
+      sContainers+="'\""+item+"\":',outputs('"+item+"'),',',";
+      sListContainers+="*"+item+"\n"
+    })
+  }
+
   return {
     "expression":sExcepExpressionTemplate.replace('<container>',sContainers.substring(0,sContainers.length-1)),
     "list":sListContainers.substring(0,sListContainers.length-1)
