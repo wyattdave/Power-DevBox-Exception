@@ -137,19 +137,14 @@ function getEnvironment(url){
       .then(data => {
         const aActions=getChildren (data.properties.definition,new Array(),0,"root");
         console.log(aActions)
-        let sContainers="";
-        let sListContainers="";
+       
         const aContainers=aActions.filter(item =>{
           return (item.type=="Scope" ||  item.type=="Foreach" ||  item.type=="Switch"||  item.type=="If" ||  item.type=="Until") && !item.operationName.toLowerCase().includes("exception")
         })
-        aContainers.forEach(item =>{
-          //sContainers+=("string(result('"+item.operationName+"')),")
-          sContainers+="'\""+item.operationName+"\":',result('"+item.operationName+"'),',',";
-          sListContainers+=item.operationName+"\n"
-        })
-        sExcepExpression=sExcepExpressionTemplate.replace('<container>',sContainers.substring(0,sContainers.length-1));
-        const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+sListContainers.substring(0,sContainers.length-1);
-        chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:sExcepExpression,popup:sPopup},
+        const oConatiners=createExpression(aContainers);
+        console.log(oConatiners)
+        const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+oConatiners.list;
+        chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:oConatiners.expression,popup:sPopup},
           function(response){
             let error = chrome.runtime.lastError;            
             if(error){
@@ -165,6 +160,20 @@ function getEnvironment(url){
       });  
     })(); 
   }
+
+function createExpression(aContainers){
+  let sContainers="";
+  let sListContainers="";
+  aContainers.forEach(item =>{
+    //sContainers+=("string(result('"+item.operationName+"')),")
+    sContainers+="'\""+item.operationName+"\":',result('"+item.operationName+"'),',',";
+    sListContainers+=item.operationName+"\n"
+  })
+  return {
+    "expression":sExcepExpressionTemplate.replace('<container>',sContainers.substring(0,sContainers.length-1)),
+    "list":sListContainers.substring(0,sListContainers.length-1)
+  }
+}
 
   function sendError(error){
     console.log(error);
