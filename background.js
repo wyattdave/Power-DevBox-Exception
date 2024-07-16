@@ -108,20 +108,16 @@ function resetIcon(){
     if(!sActiveTab){sActiveTab=details.tabId}
     if (details.tabId == sActiveTab){ 
       if (regExRegion.test(details.url)) {
-        console.log(details.url)
         apiUrl=details.url.substring(0,67);
-        //  console.log(details.url.substring(0,67))
-        
         for(var i = 0; i < details.requestHeaders.length;i++) {
           if(details.requestHeaders[i].name.toLowerCase() == "authorization"){
             sFlowAPI=details.requestHeaders[i].value; 
-            console.log(sFlowAPI)
           }
         }
       }
     }
   }, 
-    { urls: ["https://*.api.flow.microsoft.com/*","https://make.powerautomate.com/*","https://make.powerApps.com/*","https://make.powerApps.com/*"] },
+    { urls: ["https://*.api.flow.microsoft.com/*","https://make.powerautomate.com/*"] },
     ["requestHeaders", "extraHeaders"]
   );
 
@@ -144,7 +140,6 @@ function getActions(){
   (async () => {
     const [tab] = await chrome.tabs.query({active: true, lastFocusedWindow: true});
     sActiveTab=tab.id;
-    console.log(tab.url);
     oReturn=getEnvironment(tab.url);
     flowIdMatch=oReturn.flow;
     envirIdMatch=oReturn.environment;
@@ -152,14 +147,11 @@ function getActions(){
 
     fetchAPIData(sApiUrl, sFlowAPI)
     .then(data => {
-      const aActions=getChildren (data.properties.definition,new Array(),0,"root");
-      console.log(aActions)
-      
+      const aActions=getChildren (data.properties.definition,new Array(),0,"root");      
       const aContainers=aActions.filter(item =>{
         return (item.type=="Scope" ||  item.type=="Foreach" ||  item.type=="Switch"||  item.type=="If" ||  item.type=="Until") && !item.operationName.toLowerCase().includes("exception")
       })
       const oConatiners=createExpression(aContainers,[]);
-      console.log(oConatiners)
       const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+oConatiners.list;
       chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:oConatiners.expression,array:aContainers,popup:sPopup},
         function(response){
@@ -181,15 +173,12 @@ function getActions(){
 function createExpression(aContainers,aActions){
   let sContainers="";
   let sListContainers="";
-  console.log(aActions)
   aContainers.forEach(item =>{
-    //sContainers+=("string(result('"+item.operationName+"')),")
     sContainers+="'\""+item.operationName+"\":',result('"+item.operationName+"'),',',";
     sListContainers+=item.operationName+"\n"
   })
   if(aActions.length>0){
     aActions.forEach(item =>{
-      //sContainers+=("string(result('"+item.operationName+"')),")
       sContainers+="'\""+item+"\":',outputs('"+item+"'),',',";
       sListContainers+="*"+item+"\n"
     })
@@ -210,12 +199,15 @@ function createExpression(aContainers,aActions){
         });
   }
 
-  function getChildren(object,aReturn,nested,sParent){
+  function getChildren(object,aReturn,nested,sParent,sParentType){
     let parent;
+    let parentType;
     if(isObject(sParent)){
       parent=sParent.operationName;
+      parentType=sParent.type
     }else{
       parent=sParent;
+      parentType=sParentType
     }
     if(object?.actions!= undefined){
       const keys = Object.keys(object.actions);
@@ -224,9 +216,11 @@ function createExpression(aContainers,aActions){
         value.operationName=key;
         value.nestedLevel=nested;
         value.parent=parent;
+        value.parentType=parentType;
         value.branch="Yes";
         aReturn.push(value);
-        aReturn=getChildren(value,aReturn,nested+1,key);
+
+        aReturn=getChildren(value,aReturn,nested+1,key,object.actions[key].type);
       });
     }
     if(object?.else!= undefined){
@@ -236,9 +230,10 @@ function createExpression(aContainers,aActions){
         value.operationName=key;
         value.nestedLevel=nested;
         value.parent=parent;
+        value.parentType=parentType;
         value.branch="No"
         aReturn.push(value);
-        aReturn=getChildren(value,aReturn,nested+1,key);
+        aReturn=getChildren(value,aReturn,nested+1,key,object.else.actions[key].type);
       });
     }
     
@@ -253,9 +248,10 @@ function createExpression(aContainers,aActions){
           value2.operationName=key2;
           value2.nestedLevel=nested;
           value2.parent=parent;
+          value2.parentType=parentType;
           value2.branch=key;
           aReturn.push(value2);
-          aReturn=getChildren(value2,aReturn,nested+1,key2)
+          aReturn=getChildren(value2,aReturn,nested+1,key2,object.cases[key].actions[key2].type)
         })
       });
       const keysDef = Object.keys(object.default.actions);
@@ -264,9 +260,10 @@ function createExpression(aContainers,aActions){
         valueDefault.operationName=keyDef;
         valueDefault.nestedLevel=nested;
         valueDefault.parent=parent;
+        valueDefault.parentType=parentType;
         valueDefault.branch="Default";
         aReturn.push(valueDefault);
-        aReturn=getChildren(valueDefault,aReturn,nested+1,valueDefault)
+        aReturn=getChildren(valueDefault,aReturn,nested+1,valueDefault,object.default.actions[keyDef].type)
       })
       
     }

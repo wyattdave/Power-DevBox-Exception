@@ -21,12 +21,12 @@
     "https://*.dynamics.com/api/data/v9*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.min.js"
   },
   "content_scripts": [  
     {  
         "matches": [ "https://make.powerautomate.com/*","https://make.preview.powerautomate.com/*","https://make.powerapps.com/*","https://make.preview.powerapps.com/*" ],  
-       "js": ["content.js"]  
+       "js": ["content.min.js"]  
     }  
   ]
 }
