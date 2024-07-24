@@ -9,6 +9,11 @@ let bPopup=false;
 let sExpression;
 chrome.runtime.onMessage.addListener(
   function(request, sender, sendResponse) {
+
+    if(request.message=="environment"){
+      sendResponse(window.location.href);
+    }
+
     sendResponse("received")
     if(request.message =="clipboard"){
       aContainers=request.array;

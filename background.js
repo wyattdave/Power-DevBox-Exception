@@ -4,6 +4,7 @@ let sAPIflow="";
 let flowIdMatch ="";
 let envirIdMatch="";
 let timer;
+let aTabs=[];
 let bLoading=false;
 let apiUrl = 'https://us.api.flow.microsoft.com/providers/Microsoft.ProcessSimple';
 const apiUrlQuery='?api-version=2016-11-01&$expand=swagger,properties.connectionreferences.apidefinition,properties.definitionSummary.operations.apiOperation,operationDefinition,plan,properties.throttleData,properties.estimatedsuspensiondata';
@@ -16,7 +17,21 @@ const sExcepExpressionTemplate=
 "@{xpath(xml(json(concat('{\"data\": {',<container>,'}}'))),'string(//message[not(contains(.,''The execution of template action'')) and not(contains(.,''skipped:''))  and not(contains(.,''An action failed. No dependent actions succeeded.''))])')}";
 
   chrome.action.onClicked.addListener((tab) => {
-    if(sFlowAPI!="" && flowIdMatch!="" && !bLoading){
+    if(flowIdMatch=="" || envirIdMatch=="" || flowIdMatch==null || envirIdMatch==null){
+      chrome.tabs.sendMessage(sActiveTab, {message:"environment"},
+        function(response){
+          oReturn=getEnvironment(response);
+          flowIdMatch=oReturn.flow;
+          envirIdMatch=oReturn.environment;
+          getDetails()
+      });
+    }else{
+      getDetails()
+    }  
+  });
+
+  function getDetails(){
+    if(sFlowAPI!="" && flowIdMatch!="" && envirIdMatch!="" && !bLoading){
       bLoading=true;
       loading();
       getActions();
@@ -26,28 +41,35 @@ const sExcepExpressionTemplate=
         console.log(response);
       });
     }
-    if(sFlowAPI=="" && flowIdMatch!=""){
-      chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Unable to access Flow, please refresh browser"},
+    if(sFlowAPI=="" && flowIdMatch!=""  && flowIdMatch!=null){
+      chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Unable to access token, please click save or refresh the browser"},
       function(response){
         console.log(response);
         resetIcon();
       });
     }
-    if(flowIdMatch==""){
-      chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Incorrect screen, please ensure on a flow edit screen"},
+    if(flowIdMatch=="" || flowIdMatch==null){
+      chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Unable to identify flow id, please ensure on a flow edit screen"},
       function(response){
         console.log(response);
         resetIcon();
       });
     } 
-  });
+    if(envirIdMatch==""){
+      chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Unable to identify environment id, please ensure on correct screen"},
+      function(response){
+        console.log(response);
+        resetIcon();
+      });
+    } 
+  }
 
   chrome.runtime.onMessage.addListener(
     function(request, sender, sendResponse) {
       sendResponse("received")
       if(request.message =="actions"){
         const oConatiners=createExpression(request.containers,request.actions);
-        const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+oConatiners.list;
+        const sPopup="Please note only shows since last saved/published.\nExpression added to clipboard ready to paste.\nContainers:\n"+oConatiners.list;
         const aContainers=request.containers;
         chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:oConatiners.expression,array:aContainers,popup:""},
           function(response){
@@ -92,15 +114,33 @@ function resetIcon(){
 }
 
   chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, info) {
-    if(sActiveTab!=tabId && changeInfo.status == "complete"){
-        chrome.scripting.executeScript({target: {tabId: tabId}, files: ['content.js']});
-    }
-    
-    sActiveTab=tabId;
     oReturn=getEnvironment(info.url);
+    if( oReturn.environment!=""){
+      if(sActiveTab!=tabId && changeInfo.status == "complete" && !aTabs.includes(tabId)){
+        chrome.scripting.executeScript({target: {tabId: tabId}, files: ['content.js']});
+        aTabs.push(tabId);
+      }
+    sActiveTab=tabId;
     flowIdMatch=oReturn.flow;
     envirIdMatch=oReturn.environment;
+    }
+   
   })
+
+  chrome.tabs.onActivated.addListener(function(activeInfo) {
+    chrome.tabs.getSelected(null,function(tab) {
+      oReturn=getEnvironment(tab.url);
+      if(oReturn.environment!=""){
+        if(sActiveTab!=activeInfo.tabId && activeInfo.status == "complete" && !aTabs.includes(activeInfo.tabId)){
+          chrome.scripting.executeScript({target: {tabId: activeInfo.tabId}, files: ['content.js']});
+          aTabs.push(activeInfo.tabId);
+        }
+        sActiveTab=activeInfo.tabId;      
+        flowIdMatch=oReturn.flow;
+        envirIdMatch=oReturn.environment;
+      }
+    })
+  });
 
   chrome.webRequest.onBeforeSendHeaders.addListener(function(details) {
     const flowIdMatch = details.url.match(regExFlow);
@@ -124,14 +164,20 @@ function resetIcon(){
 function getEnvironment(url){
   let sEnvirIdMatch
   let sFlowIdMatch = url.match(regExFlow);
-  if(!flowIdMatch){flowIdMatch=sAPIflow};
-  if(flowIdMatch!=""){
-    sEnvirIdMatch = url.match(regExEnvir);
-    if(!sEnvirIdMatch){
-      sEnvirIdMatch=url.match(regExEnvirD)[0];
+  if(sFlowIdMatch){
+    if(!flowIdMatch){flowIdMatch=sAPIflow};
+    if(flowIdMatch!="" && flowIdMatch!=null){
+      sEnvirIdMatch = url.match(regExEnvir);
+      if(!sEnvirIdMatch){
+        sEnvirIdMatch=url.match(regExEnvirD)[0];
+      }
+      if(!sEnvirIdMatch){sEnvirIdMatch=""}
     }
+    return {environment:sEnvirIdMatch,flow:sFlowIdMatch}
+  }else{
+    return {environment:"",flow:""}
   }
-  return {environment:sEnvirIdMatch,flow:sFlowIdMatch}
+  
 }
 
 
