@@ -115,6 +115,7 @@ function resetIcon(){
 
   chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, info) {
     oReturn=getEnvironment(info.url);
+    console.log(tabId,info.url)
     if( oReturn.environment!=""){
       if(sActiveTab!=tabId && changeInfo.status == "complete" && !aTabs.includes(tabId)){
         chrome.scripting.executeScript({target: {tabId: tabId}, files: ['content.js']});
@@ -123,12 +124,14 @@ function resetIcon(){
     sActiveTab=tabId;
     flowIdMatch=oReturn.flow;
     envirIdMatch=oReturn.environment;
+   
     }
    
   })
 
   chrome.tabs.onActivated.addListener(function(activeInfo) {
-    chrome.tabs.getSelected(null,function(tab) {
+    chrome.tabs.get(activeInfo.tabId,function(tab) {
+      console.log(activeInfo.tabId,tab.url)
       oReturn=getEnvironment(tab.url);
       if(oReturn.environment!=""){
         if(sActiveTab!=activeInfo.tabId && activeInfo.status == "complete" && !aTabs.includes(activeInfo.tabId)){
@@ -138,6 +141,7 @@ function resetIcon(){
         sActiveTab=activeInfo.tabId;      
         flowIdMatch=oReturn.flow;
         envirIdMatch=oReturn.environment;
+       
       }
     })
   });
@@ -163,17 +167,24 @@ function resetIcon(){
 
 function getEnvironment(url){
   let sEnvirIdMatch
-  let sFlowIdMatch = url.match(regExFlow);
-  if(sFlowIdMatch){
-    if(!flowIdMatch){flowIdMatch=sAPIflow};
-    if(flowIdMatch!="" && flowIdMatch!=null){
-      sEnvirIdMatch = url.match(regExEnvir);
-      if(!sEnvirIdMatch){
-        sEnvirIdMatch=url.match(regExEnvirD)[0];
-      }
-      if(!sEnvirIdMatch){sEnvirIdMatch=""}
+  let sFlowIdMatch
+  let flowIdMatch = url.match(regExFlow);
+  if(flowIdMatch){
+    sFlowIdMatch=flowIdMatch[0];
+  }else{
+    sFlowIdMatch=sAPIflow;
+  } 
+  if(sFlowIdMatch!=null && sFlowIdMatch!=""){
+    let envirIdMatch = url.match(regExEnvir);
+    if(!envirIdMatch){
+      envirIdMatch=url.match(regExEnvirD);
     }
-    return {environment:sEnvirIdMatch,flow:sFlowIdMatch}
+    if(envirIdMatch){
+      sEnvirIdMatch=envirIdMatch[0]
+    }else{
+      sEnvirIdMatch=""
+    }    
+    return {environment:sEnvirIdMatch[0],flow:sFlowIdMatch}
   }else{
     return {environment:"",flow:""}
   }
@@ -237,7 +248,7 @@ function createExpression(aContainers,aActions){
 }
 
   function sendError(error){
-    console.log(error);
+    console.log(sActiveTab,error);
     chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:[],popup:'Error:\n'+error},
         function(response){
           
