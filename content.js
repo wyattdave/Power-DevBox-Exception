@@ -29,7 +29,7 @@ chrome.runtime.onMessage.addListener(
     const dAddition=document.querySelector('[id="pdb_exception"]');
     if(dAddition==undefined || dAddition==null){
       const dContainer=document.querySelector('[id*="OfficeHeaderSearchBox_container"]');        
-      dContainer.insertAdjacentHTML('beforeend', '<div style="vertical-align: middle; height:60%">'+sImg+'</div>');
+      dContainer.insertAdjacentHTML('beforeend', '<div style="vertical-align: middle; height:60%; margin-top:10px;">'+sImg+'</div>');
       const dAddition=document.querySelector('[id="pdb_exception"]');
       dAddition.addEventListener("click", showPopup);
       const dCanvas=document.querySelector('[class="flow-designer-container"]');        
