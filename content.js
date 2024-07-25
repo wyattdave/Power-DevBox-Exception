@@ -8,6 +8,7 @@ let dCanvas;
 let bLoad=false;
 let bPopup=false;
 let sExpression;
+let entryIndex=0;
 chrome.runtime.onMessage.addListener(
   function(request, sender, sendResponse) {
 
@@ -42,8 +43,7 @@ chrome.runtime.onMessage.addListener(
         dCanvas=document.querySelector('[class="flow-designer-container"]');        
       }else{
         dCanvas=document.querySelector('[class="msla-designer-canvas msla-panel-mode"]');   
-      }
-      
+      }      
       dCanvas.insertAdjacentHTML('beforeend', sPopup);
       dPopup=document.querySelector('[id="dPopup"]');
       dragElement(dPopup);        
@@ -69,16 +69,20 @@ function showPopup() {
   } 
   if(!bLoad){
     addEventListener("dblclick", (event) => {
-      if(event.target.outerHTML.includes("msla-card-title")&& bPopup){
+
+      if((event.target.outerHTML.includes("msla-card-title")||event.target.outerHTML.includes("panel-msla-title")  )&& bPopup){
         const sName=convertToName(event.target.innerText);
         if(!aActions.includes(sName) && !sExpression.includes('"'+sName+'":')){
           aActions.push(sName);
-          document.getElementById("actionlist").innerHTML+='<li id="'+sName+'">'+sName+'</li>';
-          document.getElementById(sName).addEventListener("click",  
-            function(){
-            remove(sName);
-            }
-          );
+          let node = document.createElement("li");
+          node.innerHTML=sName;
+          node.id=sName;                                 
+          node.value = entryIndex;
+          document.getElementById("actionlist").appendChild(node);
+          node.addEventListener("click", function () {
+            remove( this.getAttribute('id'));;
+          });
+          entryIndex++;
           chrome.runtime.sendMessage({ message: "actions",containers:aContainers,actions:aActions }, 
             function (response) {
               console.log(response);
@@ -100,7 +104,6 @@ function remove(action){
     }
   )
 }
-
 
 function dragElement(elmnt) {
   let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
