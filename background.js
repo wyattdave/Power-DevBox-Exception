@@ -1,9 +1,8 @@
 let sActiveTab;
 let sFlowAPI="";
 let sAPIflow="";
-let flowIdMatch ="";
-let envirIdMatch="";
 let timer;
+let oReturn;
 let aTabs=[];
 let bLoading=false;
 let apiUrl = 'https://us.api.flow.microsoft.com/providers/Microsoft.ProcessSimple';
@@ -17,21 +16,25 @@ const sExcepExpressionTemplate=
 "@{xpath(xml(json(concat('{\"data\": {',<container>,'}}'))),'string(//message[not(contains(.,''The execution of template action'')) and not(contains(.,''skipped:''))  and not(contains(.,''An action failed. No dependent actions succeeded.''))])')}";
 
   chrome.action.onClicked.addListener((tab) => {
-    if(flowIdMatch=="" || envirIdMatch=="" || flowIdMatch==null || envirIdMatch==null){
-      chrome.tabs.sendMessage(sActiveTab, {message:"environment"},
-        function(response){
-          oReturn=getEnvironment(response);
-          flowIdMatch=oReturn.flow;
-          envirIdMatch=oReturn.environment;
+    (async () => {
+      const tab = (await chrome.tabs.query({ active: true }))[0]
+      if(tab.url.includes("powerautomate.com")){
+        sActiveTab=tab.id
+        oReturn=getEnvironment(tab.url);
+        if(tab.status == "complete" && !aTabs.includes(sActiveTab)){
+          chrome.scripting.executeScript({target: {tabId: sActiveTab}, files: ['content.js']});
+          aTabs.push(sActiveTab);
           getDetails()
-      });
-    }else{
-      getDetails()
-    }  
+        }else{
+          getDetails()
+        }  
+      }
+    })(); 
   });
 
+
   function getDetails(){
-    if(sFlowAPI!="" && flowIdMatch!="" && envirIdMatch!="" && !bLoading){
+    if(sFlowAPI!="" && oReturn.flow!="" && oReturn.environment!="" && !bLoading){
       bLoading=true;
       loading();
       getActions();
@@ -41,22 +44,15 @@ const sExcepExpressionTemplate=
         console.log(response);
       });
     }
-    if(sFlowAPI=="" && flowIdMatch!=""  && flowIdMatch!=null){
+    if(sFlowAPI=="" && oReturn.flow!=""  && oReturn.flow!=null){
       chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Unable to access token, please click save or refresh the browser"},
       function(response){
         console.log(response);
         resetIcon();
       });
     }
-    if(flowIdMatch=="" || flowIdMatch==null){
-      chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Unable to identify flow id, please ensure on a flow edit screen"},
-      function(response){
-        console.log(response);
-        resetIcon();
-      });
-    } 
-    if(envirIdMatch==""){
-      chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Unable to identify environment id, please ensure on correct screen"},
+    if(oReturn.flow=="" || oReturn.flow==null){
+      chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Unable to identify flow/environment id, please ensure on a flow edit screen"},
       function(response){
         console.log(response);
         resetIcon();
@@ -113,104 +109,55 @@ function resetIcon(){
   bLoading=false;
 }
 
-  chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, info) {
-    oReturn=getEnvironment(info.url);
-    console.log(tabId,info.url)
-    if( oReturn.environment!=""){
-      if(sActiveTab!=tabId && changeInfo.status == "complete" && !aTabs.includes(tabId)){
-        chrome.scripting.executeScript({target: {tabId: tabId}, files: ['content.js']});
-        aTabs.push(tabId);
-      }
-    sActiveTab=tabId;
-    flowIdMatch=oReturn.flow;
-    envirIdMatch=oReturn.environment;
-   
-    }
-   
-  })
-
-  chrome.tabs.onActivated.addListener(function(activeInfo) {
-    chrome.tabs.get(activeInfo.tabId,function(tab) {
-      console.log(activeInfo.tabId,tab.url)
-      oReturn=getEnvironment(tab.url);
-      if(oReturn.environment!=""){
-        if(sActiveTab!=activeInfo.tabId && activeInfo.status == "complete" && !aTabs.includes(activeInfo.tabId)){
-          chrome.scripting.executeScript({target: {tabId: activeInfo.tabId}, files: ['content.js']});
-          aTabs.push(activeInfo.tabId);
-        }
-        sActiveTab=activeInfo.tabId;      
-        flowIdMatch=oReturn.flow;
-        envirIdMatch=oReturn.environment;
-       
-      }
-    })
-  });
-
-  chrome.webRequest.onBeforeSendHeaders.addListener(function(details) {
-    const flowIdMatch = details.url.match(regExFlow);
-    if(flowIdMatch){sAPIflow=flowIdMatch};
-    if(!sActiveTab){sActiveTab=details.tabId}
-    if (details.tabId == sActiveTab){ 
-      if (regExRegion.test(details.url)) {
-        apiUrl=details.url.substring(0,67);
-        for(var i = 0; i < details.requestHeaders.length;i++) {
-          if(details.requestHeaders[i].name.toLowerCase() == "authorization"){
-            sFlowAPI=details.requestHeaders[i].value; 
-          }
+chrome.webRequest.onBeforeSendHeaders.addListener(function(details) {
+  const flowIdMatch = details.url.match(regExFlow);
+  if(flowIdMatch){sAPIflow=flowIdMatch};
+  if(!sActiveTab){sActiveTab=details.tabId}
+  if (details.tabId == sActiveTab){ 
+    if (regExRegion.test(details.url)) {
+      apiUrl=details.url.substring(0,67);
+      for(var i = 0; i < details.requestHeaders.length;i++) {
+        if(details.requestHeaders[i].name.toLowerCase() == "authorization"){
+          sFlowAPI=details.requestHeaders[i].value; 
         }
       }
     }
-  }, 
-    { urls: ["https://*.api.flow.microsoft.com/*","https://make.powerautomate.com/*"] },
-    ["requestHeaders", "extraHeaders"]
-  );
+  }
+}, 
+  { urls: ["https://*.api.flow.microsoft.com/*","https://make.powerautomate.com/*"] },
+  ["requestHeaders", "extraHeaders"]
+);
 
 function getEnvironment(url){
-  let sEnvirIdMatch
-  let sFlowIdMatch
   let flowIdMatch = url.match(regExFlow);
   if(flowIdMatch){
-    sFlowIdMatch=flowIdMatch[0];
-  }else{
-    sFlowIdMatch=sAPIflow;
-  } 
-  if(sFlowIdMatch!=null && sFlowIdMatch!=""){
     let envirIdMatch = url.match(regExEnvir);
     if(!envirIdMatch){
       envirIdMatch=url.match(regExEnvirD);
     }
     if(envirIdMatch){
-      sEnvirIdMatch=envirIdMatch[0]
+      return {environment:envirIdMatch[0],flow:flowIdMatch[0]} 
     }else{
-      sEnvirIdMatch=""
+      return {environment:"",flow:""}
     }    
-    return {environment:sEnvirIdMatch[0],flow:sFlowIdMatch}
   }else{
     return {environment:"",flow:""}
-  }
-  
+  }  
 }
 
 
 function getActions(){
-
-  (async () => {
-    const [tab] = await chrome.tabs.query({active: true, lastFocusedWindow: true});
-    sActiveTab=tab.id;
-    oReturn=getEnvironment(tab.url);
-    flowIdMatch=oReturn.flow;
-    envirIdMatch=oReturn.environment;
-    const sApiUrl=apiUrl+envirIdMatch+flowIdMatch+apiUrlQuery;
-
+    const sApiUrl=apiUrl+oReturn.environment+oReturn.flow+apiUrlQuery;    
     fetchAPIData(sApiUrl, sFlowAPI)
     .then(data => {
-      const aActions=getChildren (data.properties.definition,new Array(),0,"root");      
-      const aContainers=aActions.filter(item =>{
-        return (item.type=="Scope" ||  item.type=="Foreach" ||  item.type=="Switch"||  item.type=="If" ||  item.type=="Until") && !item.operationName.toLowerCase().includes("exception")
-      })
-      const oConatiners=createExpression(aContainers,[]);
-      const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+oConatiners.list;
-      chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:oConatiners.expression,array:aContainers,popup:sPopup},
+      if(isObject(data)){
+        const aActions=getChildren (data.properties.definition,new Array(),0,"root");      
+        const aContainers=aActions.filter(item =>{
+          return (item.type=="Scope" ||  item.type=="Foreach" ||  item.type=="Switch"||  item.type=="If" ||  item.type=="Until") && !item.operationName.toLowerCase().includes("exception")
+        })
+        const oConatiners=createExpression(aContainers,[]);
+        const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+oConatiners.list;
+        chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:oConatiners.expression,array:aContainers,popup:sPopup},
         function(response){
           let error = chrome.runtime.lastError;            
           if(error){
@@ -219,12 +166,14 @@ function getActions(){
             resetIcon();
           }
       });
+      }else{
+        sendError(data)
+      }     
     })
     .catch(error => {
       console.error('Error:', error);
       sendError(error)
     });  
-  })(); 
 }
 
 function createExpression(aContainers,aActions){
@@ -348,6 +297,7 @@ function createExpression(aContainers,aActions){
       return data;
     } catch (error) {
       console.error('Error fetching API data:', error);
+      return 'Error fetching API data: '+ error
     }
   }
   

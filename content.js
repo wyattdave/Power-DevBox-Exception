@@ -4,6 +4,7 @@ const sPopup='<div id="dPopup" style="z-index:10000; width:300px;height:400px; p
 let aActions=[];
 let aContainers=[];
 let dPopup;
+let dCanvas;
 let bLoad=false;
 let bPopup=false;
 let sExpression;
@@ -15,6 +16,7 @@ chrome.runtime.onMessage.addListener(
     }
 
     sendResponse("received")
+    const bClassicUI=window.location.href.includes("v3=false");
     if(request.message =="clipboard"){
       aContainers=request.array;
       sExpression=request.data;
@@ -28,11 +30,20 @@ chrome.runtime.onMessage.addListener(
     }      
     const dAddition=document.querySelector('[id="pdb_exception"]');
     if(dAddition==undefined || dAddition==null){
-      const dContainer=document.querySelector('[id*="OfficeHeaderSearchBox_container"]');        
-      dContainer.insertAdjacentHTML('beforeend', '<div style="vertical-align: middle; height:60%; margin-top:10px;">'+sImg+'</div>');
+      const dContainer=document.querySelector('[id*="OfficeHeaderSearchBox_container"]');         
+      if(bClassicUI){
+        dContainer.insertAdjacentHTML('beforeend', '<div style="vertical-align: middle; height:60%;">'+sImg+'</div>');
+      }else{
+        dContainer.insertAdjacentHTML('beforeend', '<div style="vertical-align: middle; height:60%; margin-top:10px;">'+sImg+'</div>');
+      }      
       const dAddition=document.querySelector('[id="pdb_exception"]');
       dAddition.addEventListener("click", showPopup);
-      const dCanvas=document.querySelector('[class="flow-designer-container"]');        
+      if(bClassicUI){
+        dCanvas=document.querySelector('[class="flow-designer-container"]');        
+      }else{
+        dCanvas=document.querySelector('[class="msla-designer-canvas msla-panel-mode"]');   
+      }
+      
       dCanvas.insertAdjacentHTML('beforeend', sPopup);
       dPopup=document.querySelector('[id="dPopup"]');
       dragElement(dPopup);        
