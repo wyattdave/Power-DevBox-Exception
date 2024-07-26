@@ -24,7 +24,11 @@ chrome.runtime.onMessage.addListener(
       navigator.clipboard.writeText(request.data);
       if(request.popup!=""){
         alert(request.popup);
-      }        
+      }
+      dPopup=document.querySelector('[id="dPopup"]');
+      if(dPopup){
+    //    if(dPopup.style.display == "block"){showPopup()}
+      }      
     }
     if(request.message =="popup"){
       alert(request.popup);

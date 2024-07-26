@@ -64,10 +64,10 @@ const sExcepExpressionTemplate=
     function(request, sender, sendResponse) {
       sendResponse("received")
       if(request.message =="actions"){
-        const oConatiners=createExpression(request.containers,request.actions);
-        const sPopup="Please note only shows since last saved/published.\nExpression added to clipboard ready to paste.\nContainers:\n"+oConatiners.list;
+        const oContainers=createExpression(request.containers,request.actions);
+        const sPopup="Please note only shows since last saved/published.\nExpression added to clipboard ready to paste.\nContainers:\n"+oContainers.list;
         const aContainers=request.containers;
-        chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:oConatiners.expression,array:aContainers,popup:""},
+        chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:oContainers.expression,array:aContainers,popup:""},
           function(response){
             let error = chrome.runtime.lastError;            
             if(error){
@@ -155,9 +155,9 @@ function getActions(){
         const aContainers=aActions.filter(item =>{
           return (item.type=="Scope" ||  item.type=="Foreach" ||  item.type=="Switch"||  item.type=="If" ||  item.type=="Until") && !item.operationName.toLowerCase().includes("exception")
         })
-        const oConatiners=createExpression(aContainers,[]);
-        const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+oConatiners.list;
-        chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:oConatiners.expression,array:aContainers,popup:sPopup},
+        const oContainers=createExpression(aContainers,[]);
+        const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+oContainers.list;
+        chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:oContainers.expression,array:aContainers,popup:sPopup},
         function(response){
           let error = chrome.runtime.lastError;            
           if(error){
@@ -185,8 +185,10 @@ function createExpression(aContainers,aActions){
   })
   if(aActions.length>0){
     aActions.forEach(item =>{
-      sContainers+="'\""+item+"\":',outputs('"+item+"'),',',";
-      sListContainers+="*"+item+"\n"
+      sContainers+="'\""+item+"\":',actions('"+item+"'),',',";
+      sListContainers+="*"+item+"\n";
+      sContainers+="'\""+item+"-O\":',outputs('"+item+"'),',',";
+      sListContainers+="*"+item+"\n";
     })
   }
 
