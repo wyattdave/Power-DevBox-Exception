@@ -10,7 +10,7 @@ const apiUrlQuery='?api-version=2016-11-01&$expand=swagger,properties.connection
 const regExFlow=new RegExp( '/flows\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
 const regExEnvir=new RegExp( '/environments\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
 const regExEnvirD=new RegExp( '/environments\/Default-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
-const regExRegion = "/https:\/\/..\.api\.flow/;"
+const regExRegion = new RegExp( '^https:\/\/.*\.api\.flow\.microsoft\.com\/providers\/Microsoft\.Process.*');
 ///https://emea.api.flow.microsoft.com/providers/Microsoft.ProcessSimple
 ///https://unitedkingdom.api.flow.microsoft.com/providers/Microsoft.ProcessSimple
 ///https://api.flow.microsoft.com/providers/Microsoft.ProcessSimple
@@ -119,7 +119,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(function(details) {
   if(!sActiveTab){sActiveTab=details.tabId}
   if (details.tabId == sActiveTab){ 
     if (regExRegion.test(details.url)) {
-      apiUrl=details.url.substring(0,67);
+      //apiUrl=details.url.substring(0,67);
       for(var i = 0; i < details.requestHeaders.length;i++) {
         if(details.requestHeaders[i].name.toLowerCase() == "authorization"){
           sFlowAPI=details.requestHeaders[i].value; 
