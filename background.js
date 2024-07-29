@@ -10,7 +10,11 @@ const apiUrlQuery='?api-version=2016-11-01&$expand=swagger,properties.connection
 const regExFlow=new RegExp( '/flows\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
 const regExEnvir=new RegExp( '/environments\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
 const regExEnvirD=new RegExp( '/environments\/Default-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
-const regExRegion = /https:\/\/..\.api\.flow/;
+const regExRegion = "/https:\/\/..\.api\.flow/;"
+///https://emea.api.flow.microsoft.com/providers/Microsoft.ProcessSimple
+///https://unitedkingdom.api.flow.microsoft.com/providers/Microsoft.ProcessSimple
+///https://api.flow.microsoft.com/providers/Microsoft.ProcessSimple
+
 //const sExcepExpressionTemplate="@{split(split(replace(replace(replace(concat({containers}),'\"Message\":','\"message\":'),'\"message\":\"An action failed. No dependent actions succeeded','¬'),'essage\":\"The execution of template ','¬'),'essage\":\"')[1],'\"')[0]}"
 const sExcepExpressionTemplate=
 "@{xpath(xml(json(concat('{\"data\": {',<container>,'}}'))),'string(//message[not(contains(.,''The execution of template action'')) and not(contains(.,''skipped:''))  and not(contains(.,''An action failed. No dependent actions succeeded.''))])')}";
