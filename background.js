@@ -21,7 +21,7 @@ const sExcepExpressionTemplate=
 
   chrome.action.onClicked.addListener((tab) => {
     (async () => {
-      const tab = (await chrome.tabs.query({ active: true }))[0]
+      const tab = (await chrome.tabs.query({ active: true,lastFocusedWindow: true }))[0]
       if(tab.url.includes("powerautomate.com")){
         sActiveTab=tab.id
         oReturn=getEnvironment(tab.url);
