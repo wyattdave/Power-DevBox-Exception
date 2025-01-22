@@ -11,9 +11,7 @@ const regExFlow=new RegExp( '/flows\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 const regExEnvir=new RegExp( '/environments\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
 const regExEnvirD=new RegExp( '/environments\/Default-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
 const regExRegion = new RegExp( '^https:\/\/.*\.api\.flow\.microsoft\.com\/providers\/Microsoft\.Process.*');
-///https://emea.api.flow.microsoft.com/providers/Microsoft.ProcessSimple
-///https://unitedkingdom.api.flow.microsoft.com/providers/Microsoft.ProcessSimple
-///https://api.flow.microsoft.com/providers/Microsoft.ProcessSimple
+
 
 //const sExcepExpressionTemplate="@{split(split(replace(replace(replace(concat({containers}),'\"Message\":','\"message\":'),'\"message\":\"An action failed. No dependent actions succeeded','¬'),'essage\":\"The execution of template ','¬'),'essage\":\"')[1],'\"')[0]}"
 const sExcepExpressionTemplate=
@@ -149,16 +147,16 @@ function getEnvironment(url){
   }  
 }
 
-
 function getActions(){
     const sApiUrl=apiUrl+oReturn.environment+oReturn.flow+apiUrlQuery;    
     fetchAPIData(sApiUrl, sFlowAPI)
     .then(data => {
       if(isObject(data)){
-        const aActions=getChildren (data.properties.definition,new Array(),0,"root");      
+        const aActions=getChildren (data.properties.definition,new Array(),0,"root");    
         const aContainers=aActions.filter(item =>{
           return (item.type=="Scope" ||  item.type=="Foreach" ||  item.type=="Switch"||  item.type=="If" ||  item.type=="Until") && !item.operationName.toLowerCase().includes("exception")
         })
+
         const oContainers=createExpression(aContainers,[]);
         const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+oContainers.list;
         chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:oContainers.expression,array:aContainers,popup:sPopup},
@@ -183,9 +181,12 @@ function getActions(){
 function createExpression(aContainers,aActions){
   let sContainers="";
   let sListContainers="";
+
   aContainers.forEach(item =>{
-    sContainers+="'\""+item.operationName+"\":',result('"+item.operationName+"'),',',";
-    sListContainers+=item.operationName+"\n"
+      if(!parentIsLoop(item,aContainers) || (!item.children.includes('"type":"Foreach"') && item.type!="Foreach" && item.type!="Until")){
+        sContainers+="'\""+item.operationName+"\":',result('"+item.operationName+"'),',',";
+        sListContainers+=item.operationName+"\n"
+      } 
   })
   if(aActions.length>0){
     aActions.forEach(item =>{
@@ -205,11 +206,21 @@ function createExpression(aContainers,aActions){
   function sendError(error){
     console.log(sActiveTab,error);
     chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:[],popup:'Error:\n'+error},
-        function(response){
-          
+        function(response){          
           resetIcon();
         });
   }
+
+function parentIsLoop(object,aReturn){
+  if(object.parentType=="Foreach" || object.parentType=="Until"){
+    return true
+  }
+  oParent=aReturn.find(item =>{return item.operationName==object.parent})
+  if(oParent){  
+    return parentIsLoop(oParent,aReturn)
+  }
+  return false
+}
 
   function getChildren(object,aReturn,nested,sParent,sParentType){
     let parent;
@@ -230,6 +241,11 @@ function createExpression(aContainers,aActions){
         value.parent=parent;
         value.parentType=parentType;
         value.branch="Yes";
+        if(value?.actions!= undefined){
+          value.children=JSON.stringify(value.actions)
+        }else{
+          value.children="-";
+        }
         aReturn.push(value);
 
         aReturn=getChildren(value,aReturn,nested+1,key,object.actions[key].type);
@@ -244,6 +260,11 @@ function createExpression(aContainers,aActions){
         value.parent=parent;
         value.parentType=parentType;
         value.branch="No"
+        if(value?.actions!= undefined){
+          value.children=JSON.stringify(value.actions)
+        }else{
+          value.children="-";
+        }
         aReturn.push(value);
         aReturn=getChildren(value,aReturn,nested+1,key,object.else.actions[key].type);
       });
@@ -262,6 +283,11 @@ function createExpression(aContainers,aActions){
           value2.parent=parent;
           value2.parentType=parentType;
           value2.branch=key;
+          if(value2?.actions!= undefined){
+            value2.children=JSON.stringify(value2.actions)
+          }else{
+            value2.children="-";
+          }
           aReturn.push(value2);
           aReturn=getChildren(value2,aReturn,nested+1,key2,object.cases[key].actions[key2].type)
         })
@@ -274,6 +300,11 @@ function createExpression(aContainers,aActions){
         valueDefault.parent=parent;
         valueDefault.parentType=parentType;
         valueDefault.branch="Default";
+        if(valueDefault?.actions!= undefined){
+          valueDefault.children=JSON.stringify(value.actions)
+        }else{
+          valueDefault.children="-";
+        }
         aReturn.push(valueDefault);
         aReturn=getChildren(valueDefault,aReturn,nested+1,valueDefault,object.default.actions[keyDef].type)
       })
