@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Power DevBox Exceptions",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Creates Exception catch expression for Power Automate",
   "homepage_url":"https://powerdevbox.com/exception",
   "icons": { 
@@ -21,7 +21,7 @@
     "https://*.dynamics.com/api/data/v9*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.min.js"
   },
   "content_scripts": [  
     {  
