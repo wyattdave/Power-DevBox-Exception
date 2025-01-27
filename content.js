@@ -109,6 +109,18 @@ function remove(action){
   )
 }
 
+document.addEventListener('keydown', function(event) {
+  if (event.ctrlKey && event.key === 'e') {
+    const textToCopy = "@{concat('https://make.powerautomate.com/manage/environments/', workflow()?['tags']?['environmentName'], '/flows/', workflow()?['name'], '/runs/', workflow()?['run']['name'])}";
+    navigator.clipboard.writeText(textToCopy).then(function() {
+      console.log('Text copied to clipboard');
+    }).catch(function(err) {
+      console.error('Could not copy text: ', err);
+    });
+    event.preventDefault(); // Prevent the default action to avoid any unwanted behavior
+  }
+});
+
 function dragElement(elmnt) {
   let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
   if (document.getElementById(elmnt.id + "header")) {
