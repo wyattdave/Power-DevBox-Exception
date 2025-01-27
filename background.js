@@ -183,7 +183,7 @@ function createExpression(aContainers,aActions){
   let sListContainers="";
 
   aContainers.forEach(item =>{
-      if(!parentIsLoop(item,aContainers) || (!item.children.includes('"type":"Foreach"') && item.type!="Foreach" && item.type!="Until")){
+      if(!parentIsLoop(item,aContainers) || (!item.children.includes('"type":"Foreach"') && item.type!="Foreach" && item.type!="Until" && !(countParentLoops(item,aContainers,0)>1))){
         sContainers+="'\""+item.operationName+"\":',result('"+item.operationName+"'),',',";
         sListContainers+=item.operationName+"\n"
       } 
@@ -220,6 +220,17 @@ function parentIsLoop(object,aReturn){
     return parentIsLoop(oParent,aReturn)
   }
   return false
+}
+
+function countParentLoops(object,aReturn, iCount){
+  oParent=aReturn.find(item =>{return item.operationName==object.parent})
+  if(oParent){  
+    if(oParent.type=="Foreach" || oParent.type=="Until"){
+      iCount++;
+    }
+    return countParentLoops(oParent,aReturn,iCount)
+  }
+  return iCount;
 }
 
   function getChildren(object,aReturn,nested,sParent,sParentType){

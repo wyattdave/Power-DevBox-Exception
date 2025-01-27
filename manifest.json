@@ -21,7 +21,7 @@
     "https://*.dynamics.com/api/data/v9*"
   ],
   "background": {
-    "service_worker": "background.min.js"
+    "service_worker": "background.js"
   },
   "content_scripts": [  
     {  
