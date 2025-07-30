@@ -3,7 +3,6 @@ let sFlowAPI="";
 let sAPIflow="";
 let timer;
 let oReturn;
-let aTabs=[];
 let bLoading=false;
 let apiUrl = 'https://us.api.flow.microsoft.com/providers/Microsoft.ProcessSimple';
 const apiUrlQuery='?api-version=2016-11-01&$expand=swagger,properties.connectionreferences.apidefinition,properties.definitionSummary.operations.apiOperation,operationDefinition,plan,properties.throttleData,properties.estimatedsuspensiondata';
@@ -11,6 +10,8 @@ const regExFlow=new RegExp( '/flows\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 const regExEnvir=new RegExp( '/environments\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
 const regExEnvirD=new RegExp( '/environments\/Default-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
 const regExRegion = new RegExp( '^https:\/\/.*\.api\.flow\.microsoft\.com\/providers\/Microsoft\.Process.*');
+const regExRegion2 = new RegExp( '^https:\/\/api\.flow\.microsoft\.com\/providers\/Microsoft\.ProcessSimple\/environments');
+
 
 
 //const sExcepExpressionTemplate="@{split(split(replace(replace(replace(concat({containers}),'\"Message\":','\"message\":'),'\"message\":\"An action failed. No dependent actions succeeded','¬'),'essage\":\"The execution of template ','¬'),'essage\":\"')[1],'\"')[0]}"
@@ -23,10 +24,17 @@ const sExcepExpressionTemplate=
       if(tab.url.includes("powerautomate.com")){
         sActiveTab=tab.id
         oReturn=getEnvironment(tab.url);
-        if(tab.status == "complete" && !aTabs.includes(sActiveTab)){
-          chrome.scripting.executeScript({target: {tabId: sActiveTab}, files: ['content.js']});
-          aTabs.push(sActiveTab);
-          getDetails()
+        if(tab.status == "complete"){
+
+          try {
+            await chrome.tabs.sendMessage(sActiveTab, {message: "ping"});
+            
+            getDetails();
+          } catch (error) {
+            
+            chrome.scripting.executeScript({target: {tabId: sActiveTab}, files: ['content.js']});
+            getDetails();
+          }
         }else{
           getDetails()
         }  
@@ -46,6 +54,7 @@ const sExcepExpressionTemplate=
         console.log(response);
       });
     }
+
     if(sFlowAPI=="" && oReturn.flow!=""  && oReturn.flow!=null){
       chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Unable to access token, please click save or refresh the browser"},
       function(response){
@@ -116,7 +125,8 @@ chrome.webRequest.onBeforeSendHeaders.addListener(function(details) {
   if(flowIdMatch){sAPIflow=flowIdMatch};
   if(!sActiveTab){sActiveTab=details.tabId}
   if (details.tabId == sActiveTab){ 
-    if (regExRegion.test(details.url)) {
+    console.log("Active Tab:", details.url);
+    if (regExRegion.test(details.url)||regExRegion2.test(details.url)) {
       //apiUrl=details.url.substring(0,67);
       for(var i = 0; i < details.requestHeaders.length;i++) {
         if(details.requestHeaders[i].name.toLowerCase() == "authorization"){

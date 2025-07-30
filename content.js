@@ -27,33 +27,38 @@ chrome.runtime.onMessage.addListener(
       }
       dPopup=document.querySelector('[id="dPopup"]');
       if(dPopup){
-    //    if(dPopup.style.display == "block"){showPopup()}
-      }      
+        dPopup.remove
+      }  
+      if(document.querySelector('[id="pdb_exception"]')){
+        document.querySelector('[id="pdb_exception"]').remove();
+      }    
     }
     if(request.message =="popup"){
       alert(request.popup);
-    }      
-    const dAddition=document.querySelector('[id="pdb_exception"]');
-    if(dAddition==undefined || dAddition==null){
-      const dContainer=document.querySelector('[id*="OfficeHeaderSearchBox_container"]');         
-      if(bClassicUI){
-        dContainer.insertAdjacentHTML('beforeend', '<div style="vertical-align: middle; height:60%;">'+sImg+'</div>');
-      }else{
-        dContainer.insertAdjacentHTML('beforeend', '<div style="vertical-align: middle; height:60%; margin-top:10px;">'+sImg+'</div>');
-      }      
-      const dAddition=document.querySelector('[id="pdb_exception"]');
-      dAddition.addEventListener("click", showPopup);
-      if(bClassicUI){
-        dCanvas=document.querySelector('[class="flow-designer-container"]');        
-      }else{
-        dCanvas=document.querySelector('[class="msla-designer-canvas msla-panel-mode"]');   
-      }      
-      dCanvas.insertAdjacentHTML('beforeend', sPopup);
-      dPopup=document.querySelector('[id="dPopup"]');
-      dragElement(dPopup);        
-    }else{
-      console.log("already added")
     }    
+    if(bClassicUI){  
+      const dAddition=document.querySelector('[id="pdb_exception"]');
+      if(dAddition==undefined || dAddition==null){
+        const dContainer=document.querySelector('[id*="OfficeHeaderSearchBox_container"]');         
+        if(bClassicUI){
+          dContainer.insertAdjacentHTML('beforeend', '<div style="vertical-align: middle; height:60%;">'+sImg+'</div>');
+        }else{
+          dContainer.insertAdjacentHTML('beforeend', '<div style="vertical-align: middle; height:60%; margin-top:10px;">'+sImg+'</div>');
+        }      
+        const dAddition=document.querySelector('[id="pdb_exception"]');
+        dAddition.addEventListener("click", showPopup);
+        if(bClassicUI){
+          dCanvas=document.querySelector('[class="flow-designer-container"]');        
+        }else{
+          dCanvas=document.querySelector('[class="msla-designer-canvas msla-panel-mode"]');   
+        }      
+        dCanvas.insertAdjacentHTML('beforeend', sPopup);
+        dPopup=document.querySelector('[id="dPopup"]');
+        dragElement(dPopup);        
+      }else{
+        console.log("already added")
+      }    
+    }
   }
 )
 
