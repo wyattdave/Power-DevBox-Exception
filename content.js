@@ -143,7 +143,7 @@ function showPowerAutomatePopup(message, type = 'info') {
   const okButton = document.createElement('button');
   okButton.textContent = 'OK';
   okButton.style.cssText = `
-    background: #2A64F6;
+    background: #0078D4;
     color: white;
     border: none;
     padding: 8px 24px;
@@ -154,8 +154,8 @@ function showPowerAutomatePopup(message, type = 'info') {
     transition: background 0.1s ease;
     font-family: inherit;
   `;
-  okButton.onmouseover = () => okButton.style.background = '#1A4ED6';
-  okButton.onmouseout = () => okButton.style.background = '#2A64F6';
+  okButton.onmouseover = () => okButton.style.background = '#106EBE';
+  okButton.onmouseout = () => okButton.style.background = '#0078D4';
   okButton.onclick = () => {
     overlay.remove();
     style.remove();
