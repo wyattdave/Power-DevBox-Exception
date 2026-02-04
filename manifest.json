@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Power DevBox Exceptions",
-  "version": "1.0.10",
+  "version": "1.1.0",
   "description": "Creates Exception catch expression for Power Automate",
   "homepage_url":"https://powerdevbox.com/exception",
   "icons": { 
@@ -11,9 +11,9 @@
     "default_icon": {
       "128": "exception circle 128 v2.png" 
     },
-    "default_title": "Exception V1.0.9"
+    "default_title": "Exception V1.1.0"
   },
-  "permissions": ["activeTab", "scripting", "tabs","webRequest"],
+  "permissions": ["activeTab", "scripting", "tabs", "webRequest", "storage", "alarms"],
   "host_permissions": [
     "https://*.api.flow.microsoft.com/*",
     "https://api.flow.microsoft.com/*",

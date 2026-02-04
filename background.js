@@ -1,18 +1,206 @@
 let sActiveTab;
+let bNewMode=false;
 let sFlowAPI="";
 let sAPIflow="";
 let timer;
 let oReturn;
 let bLoading=false;
 let apiUrl = 'https://us.api.flow.microsoft.com/providers/Microsoft.ProcessSimple';
+let tokenExpiry = null; // Timestamp when the token expires
+
+// Token Management Constants
+const TOKEN_CHECK_ALARM = 'tokenCheckAlarm';
+const TOKEN_STORAGE_KEY = 'flowApiToken';
+const TOKEN_EXPIRY_STORAGE_KEY = 'flowApiTokenExpiry';
+const TOKEN_CHECK_INTERVAL_MINUTES = 5;
+const TOKEN_EXPIRY_BUFFER_SECONDS = 60; // Consider token expired 60 seconds before actual expiry
+const NEW_MODE_STORAGE_KEY = 'newModeEnabled';
+
+// Parse JWT token to extract expiry time
+function parseJwtExpiry(token) {
+  try {
+    if (!token || typeof token !== 'string') return null;
+    
+    // Remove 'Bearer ' prefix if present
+    const tokenValue = token.startsWith('Bearer ') ? token.substring(7) : token;
+    
+    // JWT has 3 parts separated by dots
+    const parts = tokenValue.split('.');
+    if (parts.length !== 3) return null;
+    
+    // Decode the payload (second part)
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    
+    // Return the expiry timestamp (exp is in seconds, convert to milliseconds)
+    if (payload.exp) {
+      return payload.exp * 1000;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error parsing JWT token:', error);
+    return null;
+  }
+}
+
+// Check if token is still valid
+function isTokenValid() {
+  if (!sFlowAPI || !tokenExpiry) return false;
+  const now = Date.now();
+  return tokenExpiry > (now + TOKEN_EXPIRY_BUFFER_SECONDS * 1000);
+}
+
+// Get token status information
+function getTokenStatus() {
+  const now = Date.now();
+  const hasToken = !!sFlowAPI;
+  const isValid = isTokenValid();
+  const minutesRemaining = tokenExpiry ? Math.max(0, Math.floor((tokenExpiry - now) / 60000)) : 0;
+  
+  return {
+    hasToken,
+    isValid,
+    minutesRemaining,
+    expiryTime: tokenExpiry ? new Date(tokenExpiry).toISOString() : null
+  };
+}
+
+// Save token to persistent storage
+async function saveTokenToStorage() {
+  try {
+    await chrome.storage.local.set({
+      [TOKEN_STORAGE_KEY]: sFlowAPI,
+      [TOKEN_EXPIRY_STORAGE_KEY]: tokenExpiry
+    });
+  } catch (error) {
+    console.error('Error saving token to storage:', error);
+  }
+}
+
+// Restore token from persistent storage
+async function restoreTokenFromStorage() {
+  try {
+    const result = await chrome.storage.local.get([TOKEN_STORAGE_KEY, TOKEN_EXPIRY_STORAGE_KEY]);
+    if (result[TOKEN_STORAGE_KEY] && result[TOKEN_EXPIRY_STORAGE_KEY]) {
+      const storedExpiry = result[TOKEN_EXPIRY_STORAGE_KEY];
+      const now = Date.now();
+      
+      // Only restore if token is still valid
+      if (storedExpiry > (now + TOKEN_EXPIRY_BUFFER_SECONDS * 1000)) {
+        sFlowAPI = result[TOKEN_STORAGE_KEY];
+        tokenExpiry = storedExpiry;
+        console.log('Token restored from storage, expires in', Math.floor((tokenExpiry - now) / 60000), 'minutes');
+        updateBadge();
+        return true;
+      } else {
+        console.log('Stored token has expired, clearing storage');
+        await clearTokenFromStorage();
+      }
+    }
+    return false;
+  } catch (error) {
+    console.error('Error restoring token from storage:', error);
+    return false;
+  }
+}
+
+// Clear token from storage
+async function clearTokenFromStorage() {
+  try {
+    await chrome.storage.local.remove([TOKEN_STORAGE_KEY, TOKEN_EXPIRY_STORAGE_KEY]);
+    console.log('Token cleared from storage');
+  } catch (error) {
+    console.error('Error clearing token from storage:', error);
+  }
+}
+
+// Invalidate expired token
+async function invalidateExpiredToken() {
+  sFlowAPI = "";
+  tokenExpiry = null;
+  await clearTokenFromStorage();
+  updateBadge();
+}
+
+// Update badge to show token status
+function updateBadge() {
+  if (!sFlowAPI || !isTokenValid()) {
+    chrome.action.setBadgeText({ text: '!' });
+    chrome.action.setBadgeBackgroundColor({ color: '#FF0000' });
+    chrome.action.setTitle({ title: 'Token expired or missing - refresh the page' });
+  } else {
+    chrome.action.setBadgeText({ text: '' });
+    chrome.action.setTitle({ title: 'Power DevBox Exceptions' });
+  }
+}
+
+// Periodic token check handler
+async function checkTokenStatus() {
+  const status = getTokenStatus();
+  console.log('Token status:', status);
+  
+  if (status.hasToken && !status.isValid) {
+    await invalidateExpiredToken();
+  }
+  updateBadge();
+}
+
+// Setup periodic token check alarm
+async function setupTokenCheckAlarm() {
+  try {
+    // Clear any existing alarm
+    await chrome.alarms.clear(TOKEN_CHECK_ALARM);
+    
+    // Create new alarm that fires every TOKEN_CHECK_INTERVAL_MINUTES
+    await chrome.alarms.create(TOKEN_CHECK_ALARM, {
+      periodInMinutes: TOKEN_CHECK_INTERVAL_MINUTES
+    });
+
+  } catch (error) {
+    console.error('Error setting up token check alarm:', error);
+  }
+}
+
+// Handle alarm events
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === TOKEN_CHECK_ALARM) {
+    checkTokenStatus();
+  }
+});
+
+// Save bNewMode to storage
+async function saveNewModeToStorage() {
+  try {
+    await chrome.storage.local.set({ [NEW_MODE_STORAGE_KEY]: bNewMode });
+  } catch (error) {
+    console.error('Error saving new mode to storage:', error);
+  }
+}
+
+// Restore bNewMode from storage
+async function restoreNewModeFromStorage() {
+  try {
+    const result = await chrome.storage.local.get([NEW_MODE_STORAGE_KEY]);
+    if (result[NEW_MODE_STORAGE_KEY] !== undefined) {
+      bNewMode = result[NEW_MODE_STORAGE_KEY];
+    }
+  } catch (error) {
+    console.error('Error restoring new mode from storage:', error);
+  }
+}
+
+// Initialize token management on service worker startup
+(async function initializeTokenManagement() {
+  await restoreTokenFromStorage();
+  await restoreNewModeFromStorage();
+  await setupTokenCheckAlarm();
+  updateBadge();
+})();
 const apiUrlQuery='?api-version=2016-11-01&$expand=swagger,properties.connectionreferences.apidefinition,properties.definitionSummary.operations.apiOperation,operationDefinition,plan,properties.throttleData,properties.estimatedsuspensiondata';
 const regExFlow=new RegExp( '/flows\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
 const regExEnvir=new RegExp( '/environments\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
 const regExEnvirD=new RegExp( '/environments\/Default-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
 const regExRegion = new RegExp( '^https:\/\/.*\.api\.flow\.microsoft\.com\/providers\/Microsoft\.Process.*');
 const regExRegion2 = new RegExp( '^https:\/\/api\.flow\.microsoft\.com\/providers\/Microsoft\.ProcessSimple\/environments');
-
-
 
 //const sExcepExpressionTemplate="@{split(split(replace(replace(replace(concat({containers}),'\"Message\":','\"message\":'),'\"message\":\"An action failed. No dependent actions succeeded','¬'),'essage\":\"The execution of template ','¬'),'essage\":\"')[1],'\"')[0]}"
 const sExcepExpressionTemplate=
@@ -51,21 +239,20 @@ const sExcepExpressionTemplate=
     }else if(bLoading){
       chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"For more information please visit: www.powerdevbox.com"},
       function(response){
-        console.log(response);
       });
     }
 
     if(sFlowAPI=="" && oReturn.flow!=""  && oReturn.flow!=null){
       chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Unable to access token, please click save or refresh the browser"},
       function(response){
-        console.log(response);
+    
         resetIcon();
       });
     }
     if(oReturn.flow=="" || oReturn.flow==null){
       chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Unable to identify flow/environment id, please ensure on a flow edit screen"},
       function(response){
-        console.log(response);
+    
         resetIcon();
       });
     } 
@@ -73,6 +260,17 @@ const sExcepExpressionTemplate=
 
   chrome.runtime.onMessage.addListener(
     function(request, sender, sendResponse) {
+      if(request.message === "getTokenStatus"){
+        const status = getTokenStatus();
+        sendResponse(status);
+        return true;
+      }
+      if(request.message === "toggleNewMode"){
+        bNewMode = !bNewMode;
+        saveNewModeToStorage();
+        sendResponse({ newMode: bNewMode });
+        return true;
+      }
       sendResponse("received")
       if(request.message =="actions"){
         const oContainers=createExpression(request.containers,request.actions);
@@ -125,12 +323,29 @@ chrome.webRequest.onBeforeSendHeaders.addListener(function(details) {
   if(flowIdMatch){sAPIflow=flowIdMatch};
   if(!sActiveTab){sActiveTab=details.tabId}
   if (details.tabId == sActiveTab){ 
-    console.log("Active Tab:", details.url);
     if (regExRegion.test(details.url)||regExRegion2.test(details.url)) {
       //apiUrl=details.url.substring(0,67);
       for(var i = 0; i < details.requestHeaders.length;i++) {
         if(details.requestHeaders[i].name.toLowerCase() == "authorization"){
-          sFlowAPI=details.requestHeaders[i].value; 
+          const newToken = details.requestHeaders[i].value;
+          
+          // Only update if we got a new token
+          if (newToken && newToken !== sFlowAPI) {
+            sFlowAPI = newToken;
+            
+            // Parse the JWT to get expiry time
+            const expiry = parseJwtExpiry(newToken);
+            if (expiry) {
+              tokenExpiry = expiry;
+              console.log('New token captured, expires at:', new Date(tokenExpiry).toISOString());
+              
+              // Save to persistent storage
+              saveTokenToStorage();
+            }
+            
+            // Update badge to show valid token status
+            updateBadge();
+          }
         }
       }
     }
@@ -167,7 +382,9 @@ function getActions(){
           return (item.type=="Scope" ||  item.type=="Foreach" ||  item.type=="Switch"||  item.type=="If" ||  item.type=="Until") && !item.operationName.toLowerCase().includes("exception")
         })
 
-        const oContainers=createExpression(aContainers,[]);
+        const aApiActions=aActions.filter(item =>{return item.type=="OpenApiConnection"});
+
+        const oContainers=createExpression(aContainers,aApiActions);
         const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+oContainers.list;
         chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:oContainers.expression,array:aContainers,popup:sPopup},
         function(response){
@@ -198,12 +415,12 @@ function createExpression(aContainers,aActions){
         sListContainers+=item.operationName+"\n"
       } 
   })
-  if(aActions.length>0){
+  if(aActions.length>0 && bNewMode){
+    sListContainers+="\nAPI Actions:\n";
     aActions.forEach(item =>{
-      sContainers+="'\""+item+"\":',actions('"+item+"'),',',";
-      sListContainers+="*"+item+"\n";
-      sContainers+="'\""+item+"-O\":',outputs('"+item+"'),',',";
-      sListContainers+="*"+item+"\n";
+      sContainers+="'\""+item.operationName+"\":',actions('"+item.operationName+"'),',',";
+      sContainers+="'\""+item.operationName+"-O\":',outputs('"+item.operationName+"'),',',";
+      sListContainers+=item.operationName+"\n";
     })
   }
 
@@ -214,7 +431,6 @@ function createExpression(aContainers,aActions){
 }
 
   function sendError(error){
-    console.log(sActiveTab,error);
     chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:[],popup:'Error:\n'+error},
         function(response){          
           resetIcon();
