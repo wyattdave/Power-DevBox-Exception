@@ -382,8 +382,7 @@ function getActions(){
           return (item.type=="Scope" ||  item.type=="Foreach" ||  item.type=="Switch"||  item.type=="If" ||  item.type=="Until") && !item.operationName.toLowerCase().includes("exception")
         })
 
-        const aApiActions=aActions.filter(item =>{return item.type=="OpenApiConnection"});
-
+        const aApiActions=aActions.filter(item =>{return item.type=="OpenApiConnection" && !item.operationName.toLowerCase().includes("exception")});
         const oContainers=createExpression(aContainers,aApiActions);
         const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+oContainers.list;
         chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:oContainers.expression,array:aContainers,popup:sPopup},
