@@ -167,6 +167,53 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
+
+// Initialize token management on service worker startup
+(async function initializeTokenManagement() {
+  await restoreTokenFromStorage();
+  await restoreNewModeFromStorage();
+  await setupTokenCheckAlarm();
+  updateBadge();
+})();
+
+chrome.webRequest.onBeforeSendHeaders.addListener(function(details) {
+  const flowIdMatch = details.url.match(regExFlow);
+  if(flowIdMatch){sAPIflow=flowIdMatch};
+  if(!sActiveTab){sActiveTab=details.tabId}
+ 
+    if (regExRegion.test(details.url)||regExRegion2.test(details.url)) {
+      //apiUrl=details.url.substring(0,67);
+      for(var i = 0; i < details.requestHeaders.length;i++) {
+        if(details.requestHeaders[i].name.toLowerCase() == "authorization"){
+          const newToken = details.requestHeaders[i].value;
+          
+          // Only update if we got a new token
+          if (newToken && newToken !== sFlowAPI) {
+            sFlowAPI = newToken;
+            
+            // Parse the JWT to get expiry time
+            const expiry = parseJwtExpiry(newToken);
+            if (expiry) {
+              tokenExpiry = expiry;
+              console.log('New token captured, expires at:', new Date(tokenExpiry).toISOString());
+              
+              // Save to persistent storage
+              saveTokenToStorage();
+            }
+            
+            // Update badge to show valid token status
+            updateBadge();
+          }
+        }
+      }
+    
+  }
+}, 
+  { urls: ["https://*.api.flow.microsoft.com/*","https://make.powerautomate.com/*"] },
+  ["requestHeaders", "extraHeaders"]
+);
+
+///////////////
 // Save bNewMode to storage
 async function saveNewModeToStorage() {
   try {
@@ -188,13 +235,7 @@ async function restoreNewModeFromStorage() {
   }
 }
 
-// Initialize token management on service worker startup
-(async function initializeTokenManagement() {
-  await restoreTokenFromStorage();
-  await restoreNewModeFromStorage();
-  await setupTokenCheckAlarm();
-  updateBadge();
-})();
+
 const apiUrlQuery='?api-version=2016-11-01&$expand=swagger,properties.connectionreferences.apidefinition,properties.definitionSummary.operations.apiOperation,operationDefinition,plan,properties.throttleData,properties.estimatedsuspensiondata';
 const regExFlow=new RegExp( '/flows\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
 const regExEnvir=new RegExp( '/environments\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
@@ -318,42 +359,7 @@ function resetIcon(){
   bLoading=false;
 }
 
-chrome.webRequest.onBeforeSendHeaders.addListener(function(details) {
-  const flowIdMatch = details.url.match(regExFlow);
-  if(flowIdMatch){sAPIflow=flowIdMatch};
-  if(!sActiveTab){sActiveTab=details.tabId}
-  if (details.tabId == sActiveTab){ 
-    if (regExRegion.test(details.url)||regExRegion2.test(details.url)) {
-      //apiUrl=details.url.substring(0,67);
-      for(var i = 0; i < details.requestHeaders.length;i++) {
-        if(details.requestHeaders[i].name.toLowerCase() == "authorization"){
-          const newToken = details.requestHeaders[i].value;
-          
-          // Only update if we got a new token
-          if (newToken && newToken !== sFlowAPI) {
-            sFlowAPI = newToken;
-            
-            // Parse the JWT to get expiry time
-            const expiry = parseJwtExpiry(newToken);
-            if (expiry) {
-              tokenExpiry = expiry;
-              console.log('New token captured, expires at:', new Date(tokenExpiry).toISOString());
-              
-              // Save to persistent storage
-              saveTokenToStorage();
-            }
-            
-            // Update badge to show valid token status
-            updateBadge();
-          }
-        }
-      }
-    }
-  }
-}, 
-  { urls: ["https://*.api.flow.microsoft.com/*","https://make.powerautomate.com/*"] },
-  ["requestHeaders", "extraHeaders"]
-);
+
 
 function getEnvironment(url){
   let flowIdMatch = url.match(regExFlow);

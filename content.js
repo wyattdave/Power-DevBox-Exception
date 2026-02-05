@@ -6,13 +6,13 @@ let bPopup=false;
 let sExpression;
 let entryIndex=0;
 
-// Keyboard listener for Ctrl+M to toggle New Mode
+// Keyboard listener for Ctrl+M to toggle Advanced Mode
 document.addEventListener('keydown', function(event) {
   if (event.ctrlKey && event.key.toLowerCase() === 'm') {
     event.preventDefault();
     chrome.runtime.sendMessage({ message: "toggleNewMode" }, function(response) {
       if (response && response.newMode !== undefined) {
-        const modeName = response.newMode ? 'New Mode' : 'Legacy Mode';
+        const modeName = response.newMode ? 'Advanced Mode' : 'Standard Mode';
         showPowerAutomatePopup('Mode set to: ' + modeName, 'info');
       }
     });

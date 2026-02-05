@@ -13,7 +13,7 @@
     },
     "default_title": "Exception V1.1.0"
   },
-  "permissions": ["activeTab", "scripting", "tabs", "webRequest", "storage", "alarms"],
+  "permissions": [ "scripting", "tabs", "webRequest", "storage", "alarms"],
   "host_permissions": [
     "https://*.api.flow.microsoft.com/*",
     "https://api.flow.microsoft.com/*",
