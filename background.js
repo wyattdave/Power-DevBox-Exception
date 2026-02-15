@@ -5,7 +5,7 @@ let sAPIflow="";
 let timer;
 let oReturn;
 let bLoading=false;
-let apiUrl = 'https://us.api.flow.microsoft.com/providers/Microsoft.ProcessSimple';
+let apiUrl = 'dynamics.com';
 let tokenExpiry = null; // Timestamp when the token expires
 
 // Token Management Constants
@@ -177,13 +177,12 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 })();
 
 chrome.webRequest.onBeforeSendHeaders.addListener(function(details) {
-  const flowIdMatch = details.url.match(regExFlow);
-  if(flowIdMatch){sAPIflow=flowIdMatch};
-  if(!sActiveTab){sActiveTab=details.tabId}
- 
-    if (regExRegion.test(details.url)||regExRegion2.test(details.url)) {
-      //apiUrl=details.url.substring(0,67);
-      for(var i = 0; i < details.requestHeaders.length;i++) {
+    if (details.url.includes("dynamics.com")) {
+      if(details.url.includes("workflows(")){
+          sAPIflow=details.url.match(regExFlow)[0];
+          apiUrl=details.url.split(")")[0]+")";
+      }
+      for(let i = 0; i < details.requestHeaders.length;i++) {
         if(details.requestHeaders[i].name.toLowerCase() == "authorization"){
           const newToken = details.requestHeaders[i].value;
           
@@ -209,11 +208,11 @@ chrome.webRequest.onBeforeSendHeaders.addListener(function(details) {
     
   }
 }, 
-  { urls: ["https://*.api.flow.microsoft.com/*","https://make.powerautomate.com/*"] },
+  { urls: ["https://*.dynamics.com/*"] },
   ["requestHeaders", "extraHeaders"]
 );
 
-///////////////
+///////////////"https://*.api.flow.microsoft.com/*"
 // Save bNewMode to storage
 async function saveNewModeToStorage() {
   try {
@@ -235,15 +234,8 @@ async function restoreNewModeFromStorage() {
   }
 }
 
-
-const apiUrlQuery='?api-version=2016-11-01&$expand=swagger,properties.connectionreferences.apidefinition,properties.definitionSummary.operations.apiOperation,operationDefinition,plan,properties.throttleData,properties.estimatedsuspensiondata';
-const regExFlow=new RegExp( '/flows\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
-const regExEnvir=new RegExp( '/environments\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
-const regExEnvirD=new RegExp( '/environments\/Default-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
-const regExRegion = new RegExp( '^https:\/\/.*\.api\.flow\.microsoft\.com\/providers\/Microsoft\.Process.*');
-const regExRegion2 = new RegExp( '^https:\/\/api\.flow\.microsoft\.com\/providers\/Microsoft\.ProcessSimple\/environments');
-
-//const sExcepExpressionTemplate="@{split(split(replace(replace(replace(concat({containers}),'\"Message\":','\"message\":'),'\"message\":\"An action failed. No dependent actions succeeded','¬'),'essage\":\"The execution of template ','¬'),'essage\":\"')[1],'\"')[0]}"
+const regExFlow = new RegExp('workflows\\(([0-9a-fA-F-]{36})\\)');
+//const sExcepExpressionTemplate="@{split(split(replace(replace(replace(concat({containers}),'\"Message\":','\"message\":'),'\"message\":\"An action failed. No dependent actions succeeded','¬'),'essage\":\"The execution of template ','¬'),'essage\":\"')[1],'\"')[0]"
 const sExcepExpressionTemplate=
 "@{xpath(xml(json(concat('{\"data\": {',<container>,'}}'))),'string(//message[not(contains(.,''The execution of template action'')) and not(contains(.,''skipped:''))  and not(contains(.,''An action failed. No dependent actions succeeded.''))])')}";
 
@@ -252,7 +244,6 @@ const sExcepExpressionTemplate=
       const tab = (await chrome.tabs.query({ active: true,lastFocusedWindow: true }))[0]
       if(tab.url.includes("powerautomate.com")){
         sActiveTab=tab.id
-        oReturn=getEnvironment(tab.url);
         if(tab.status == "complete"){
 
           try {
@@ -273,7 +264,7 @@ const sExcepExpressionTemplate=
 
 
   function getDetails(){
-    if(sFlowAPI!="" && oReturn.flow!="" && oReturn.environment!="" && !bLoading){
+    if(sFlowAPI!="" && sAPIflow!="" && !bLoading){
       bLoading=true;
       loading();
       getActions();
@@ -283,15 +274,15 @@ const sExcepExpressionTemplate=
       });
     }
 
-    if(sFlowAPI=="" && oReturn.flow!=""  && oReturn.flow!=null){
+    if(sFlowAPI=="" && sAPIflow!=""  && sAPIflow!=null){
       chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Unable to access token, please click save or refresh the browser"},
       function(response){
     
         resetIcon();
       });
     }
-    if(oReturn.flow=="" || oReturn.flow==null){
-      chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Unable to identify flow/environment id, please ensure on a flow edit screen"},
+    if(sAPIflow=="" || sAPIflow==null){
+      chrome.tabs.sendMessage(sActiveTab, {message:"popup",data:[],popup:"Unable to identify flow id, please ensure on a flow edit screen"},
       function(response){
     
         resetIcon();
@@ -359,38 +350,19 @@ function resetIcon(){
   bLoading=false;
 }
 
-
-
-function getEnvironment(url){
-  let flowIdMatch = url.match(regExFlow);
-  if(flowIdMatch){
-    let envirIdMatch = url.match(regExEnvir);
-    if(!envirIdMatch){
-      envirIdMatch=url.match(regExEnvirD);
-    }
-    if(envirIdMatch){
-      return {environment:envirIdMatch[0],flow:flowIdMatch[0]} 
-    }else{
-      return {environment:"",flow:""}
-    }    
-  }else{
-    return {environment:"",flow:""}
-  }  
-}
-
 function getActions(){
-    const sApiUrl=apiUrl+oReturn.environment+oReturn.flow+apiUrlQuery;    
-    fetchAPIData(sApiUrl, sFlowAPI)
+    fetchAPIData(apiUrl, sFlowAPI)
     .then(data => {
       if(isObject(data)){
-        const aActions=getChildren (data.properties.definition,new Array(),0,"root");    
+        const oDefinition=JSON.parse(data.clientdata);
+        const aActions=getChildren (oDefinition.properties.definition,new Array(),0,"root");    
         const aContainers=aActions.filter(item =>{
           return (item.type=="Scope" ||  item.type=="Foreach" ||  item.type=="Switch"||  item.type=="If" ||  item.type=="Until") && !item.operationName.toLowerCase().includes("exception")
         })
 
         const aApiActions=aActions.filter(item =>{return item.type=="OpenApiConnection" && !item.operationName.toLowerCase().includes("exception")});
         const oContainers=createExpression(aContainers,aApiActions);
-        const sPopup="Please note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+oContainers.list;
+        const sPopup=data.name+"\nPlease note only shows since last saved/publishd.\nExpression added to clipboard ready to paste.\nContainers:\n"+oContainers.list;
         chrome.tabs.sendMessage(sActiveTab, {message:"clipboard",data:oContainers.expression,array:aContainers,popup:sPopup},
         function(response){
           let error = chrome.runtime.lastError;            
@@ -579,4 +551,3 @@ function countParentLoops(object,aReturn, iCount){
       return 'Error fetching API data: '+ error
     }
   }
-  
