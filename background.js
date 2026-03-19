@@ -345,7 +345,7 @@ const sExcepExpressionTemplate=
 function resetIcon(){
   clearInterval(timer);
   chrome.action.setIcon({
-    path: "exception circle 128 v2.png"
+    path: "exception circle 128 v3.png"
   });
   bLoading=false;
 }
@@ -395,9 +395,11 @@ function createExpression(aContainers,aActions){
   if(aActions.length>0 && bNewMode){
     sListContainers+="\nAPI Actions:\n";
     aActions.forEach(item =>{
-      sContainers+="'\""+item.operationName+"\":',actions('"+item.operationName+"'),',',";
-      sContainers+="'\""+item.operationName+"-O\":',outputs('"+item.operationName+"'),',',";
-      sListContainers+=item.operationName+"\n";
+      if(!parentIsLoop(item,aContainers) || !(countParentLoops(item,aContainers,0)>1)){
+        sContainers+="'\""+item.operationName+"\":',actions('"+item.operationName+"'),',',";
+        sContainers+="'\""+item.operationName+"-O\":',outputs('"+item.operationName+"'),',',";
+        sListContainers+=item.operationName+"\n";
+      }
     })
   }
 
